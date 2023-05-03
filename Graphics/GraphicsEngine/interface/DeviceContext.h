@@ -409,7 +409,7 @@ struct DrawIndirectAttribs
 
     /// When DrawCount > 1, the byte stride between successive sets of draw parameters.
     /// Must be a multiple of 4 and greater than or equal to 16 bytes.
-    Uint32 DrawArgsStride           DEFAULT_INITIALIZER(sizeof(Uint32) * 4);
+    Uint32 DrawArgsStride           DEFAULT_INITIALIZER(16);
 
     /// State transition mode for indirect draw arguments buffer.
     RESOURCE_STATE_TRANSITION_MODE  AttribsBufferStateTransitionMode DEFAULT_INITIALIZER(RESOURCE_STATE_TRANSITION_MODE_NONE);
@@ -487,7 +487,7 @@ struct DrawIndexedIndirectAttribs
 
     /// When DrawCount > 1, the byte stride between successive sets of draw parameters.
     /// Must be a multiple of 4 and greater than or equal to 20 bytes.
-    Uint32 DrawArgsStride           DEFAULT_INITIALIZER(sizeof(Uint32) * 5);
+    Uint32 DrawArgsStride           DEFAULT_INITIALIZER(20);
 
     /// State transition mode for indirect draw arguments buffer.
     RESOURCE_STATE_TRANSITION_MODE AttribsBufferStateTransitionMode DEFAULT_INITIALIZER(RESOURCE_STATE_TRANSITION_MODE_NONE);
