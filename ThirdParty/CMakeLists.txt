@@ -142,6 +142,15 @@ if (VULKAN_SUPPORTED AND (PLATFORM_WIN32 OR PLATFORM_LINUX OR PLATFORM_MACOS OR 
     install(FILES "${volk_SOURCE_DIR}/LICENSE.md" DESTINATION "Licenses/ThirdParty/${DILIGENT_CORE_DIR}" RENAME Volk-License.md)
 endif()
 
+if (WEBGPU_SUPPORTED)
+    get_property(ARCH_CACHE_VALUE CACHE ARCH PROPERTY VALUE)
+    unset(ARCH CACHE)
+    set(WEBGPU_BACKEND WGPU)
+    add_subdirectory(webgpu)
+    set_directory_root_folder("webgpu" "DiligentCore/ThirdParty/webgpu")
+    set(ARCH "${ARCH_CACHE_VALUE}" CACHE INTERNAL "")
+endif()
+
 if ((${DILIGENT_BUILD_GOOGLE_TEST}) AND (NOT TARGET gtest))
     set(INSTALL_GTEST OFF CACHE BOOL "Do not install googletest")
     set(BUILD_GMOCK OFF CACHE BOOL "Do not build gmock")
