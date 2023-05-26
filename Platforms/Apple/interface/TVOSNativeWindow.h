@@ -33,13 +33,14 @@ DILIGENT_BEGIN_NAMESPACE(Diligent)
 struct TVOSNativeWindow
 {
     void* pCALayer DEFAULT_INITIALIZER(nullptr);
+    bool isSDL     DEFAULT_INITIALIZER(false);
 
 #if DILIGENT_CPP_INTERFACE
     TVOSNativeWindow() noexcept
     {}
 
-    explicit TVOSNativeWindow(void* _pCALayer) noexcept :
-        pCALayer{_pCALayer}
+    explicit TVOSNativeWindow(void* _pCALayer, bool _isSDL = false) noexcept :
+        pCALayer{_pCALayer}, isSDL{_isSDL}
     {}
 #endif
 };

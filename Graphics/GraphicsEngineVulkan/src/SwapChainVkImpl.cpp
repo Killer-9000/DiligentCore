@@ -33,6 +33,7 @@
 #include "VulkanTypeConversions.hpp"
 #include "EngineMemory.h"
 #include "GraphicsAccessories.hpp"
+#include "SDL_vulkan.h"
 
 namespace Diligent
 {
@@ -70,80 +71,90 @@ void SwapChainVkImpl::CreateSurface()
 
     // Create OS-specific surface
     VkResult err = VK_ERROR_INITIALIZATION_FAILED;
+
+    if (m_Window.isSDL)
+    {
+        if (SDL_Vulkan_CreateSurface((SDL_Window*)m_Window.hWnd, m_VulkanInstance->GetVkInstance(), &m_VkSurface))
+            err = VK_SUCCESS;
+    }
+    else
+    {
+
 #if defined(VK_USE_PLATFORM_WIN32_KHR)
-    if (m_Window.hWnd != NULL)
-    {
-        VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.hinstance = GetModuleHandle(NULL);
-        surfaceCreateInfo.hwnd      = (HWND)m_Window.hWnd;
+        if (m_Window.hWnd != nullptr)
+        {
+            VkWin32SurfaceCreateInfoKHR surfaceCreateInfo{};
+            surfaceCreateInfo.sType     = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.hinstance = GetModuleHandle(NULL);
+            surfaceCreateInfo.hwnd      = (HWND)m_Window.hWnd;
 
-        err = vkCreateWin32SurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
-    }
+            err = vkCreateWin32SurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
+        }
 #elif defined(VK_USE_PLATFORM_ANDROID_KHR)
-    if (m_Window.pAWindow != nullptr)
-    {
-        VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.window = (ANativeWindow*)m_Window.pAWindow;
+        if (m_Window.pAWindow != nullptr)
+        {
+            VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo{};
+            surfaceCreateInfo.sType  = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.window = (ANativeWindow*)m_Window.pAWindow;
 
-        err = vkCreateAndroidSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, NULL, &m_VkSurface);
-    }
+            err = vkCreateAndroidSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, NULL, &m_VkSurface);
+        }
 #elif defined(VK_USE_PLATFORM_IOS_MVK)
-    if (m_Window.pCALayer != nullptr)
-    {
-        VkIOSSurfaceCreateInfoMVK surfaceCreateInfo{};
-        surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_IOS_SURFACE_CREATE_INFO_MVK;
-        surfaceCreateInfo.pView = m_Window.pCALayer;
+        if (m_Window.pCALayer != nullptr)
+        {
+            VkIOSSurfaceCreateInfoMVK surfaceCreateInfo{};
+            surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_IOS_SURFACE_CREATE_INFO_MVK;
+            surfaceCreateInfo.pView = m_Window.pCALayer;
 
-        err = vkCreateIOSSurfaceMVK(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
-    }
+            err = vkCreateIOSSurfaceMVK(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
+        }
 #elif defined(VK_USE_PLATFORM_MACOS_MVK)
-    if (m_Window.pNSView != nullptr)
-    {
-        VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo{};
-        surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
-        surfaceCreateInfo.pView = m_Window.pNSView;
+        if (m_Window.pNSView != nullptr)
+        {
+            VkMacOSSurfaceCreateInfoMVK surfaceCreateInfo{};
+            surfaceCreateInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+            surfaceCreateInfo.pView = m_Window.pNSView;
 
-        err = vkCreateMacOSSurfaceMVK(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, NULL, &m_VkSurface);
-    }
+            err = vkCreateMacOSSurfaceMVK(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, NULL, &m_VkSurface);
+        }
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-    if (m_Window.pDisplay != nullptr)
-    {
-        VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType   = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.display = reinterpret_cast<struct wl_display*>(m_Window.pDisplay);
-        surfaceCreateInfo.Surface = reinterpret_cast<struct wl_surface*>(nullptr);
+        if (m_Window.pDisplay != nullptr)
+        {
+            VkWaylandSurfaceCreateInfoKHR surfaceCreateInfo{};
+            surfaceCreateInfo.sType   = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.display = reinterpret_cast<struct wl_display*>(m_Window.pDisplay);
+            surfaceCreateInfo.Surface = reinterpret_cast<struct wl_surface*>(nullptr);
 
-        err = vkCreateWaylandSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
-    }
+            err = vkCreateWaylandSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
+        }
 #elif defined(VK_USE_PLATFORM_XCB_KHR) || defined(VK_USE_PLATFORM_XLIB_KHR)
 
 #    if defined(VK_USE_PLATFORM_XCB_KHR)
-    if (m_Window.pXCBConnection != nullptr && m_Window.WindowId != 0)
-    {
-        VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.connection = reinterpret_cast<xcb_connection_t*>(m_Window.pXCBConnection);
-        surfaceCreateInfo.window     = m_Window.WindowId;
+        if (m_Window.pXCBConnection != nullptr && m_Window.WindowId != 0)
+        {
+            VkXcbSurfaceCreateInfoKHR surfaceCreateInfo{};
+            surfaceCreateInfo.sType      = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.connection = reinterpret_cast<xcb_connection_t*>(m_Window.pXCBConnection);
+            surfaceCreateInfo.window     = m_Window.WindowId;
 
-        err = vkCreateXcbSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
-    }
+            err = vkCreateXcbSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
+        }
 #    endif
 
 #    if defined(VK_USE_PLATFORM_XLIB_KHR)
-    if ((m_Window.pDisplay != nullptr && m_Window.WindowId != 0) && m_VkSurface == VK_NULL_HANDLE)
-    {
-        VkXlibSurfaceCreateInfoKHR surfaceCreateInfo{};
-        surfaceCreateInfo.sType  = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
-        surfaceCreateInfo.dpy    = reinterpret_cast<Display*>(m_Window.pDisplay);
-        surfaceCreateInfo.window = m_Window.WindowId;
+        if ((m_Window.pDisplay != nullptr && m_Window.WindowId != 0) && m_VkSurface == VK_NULL_HANDLE)
+        {
+            VkXlibSurfaceCreateInfoKHR surfaceCreateInfo{};
+            surfaceCreateInfo.sType  = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+            surfaceCreateInfo.dpy    = reinterpret_cast<Display*>(m_Window.pDisplay);
+            surfaceCreateInfo.window = m_Window.WindowId;
 
-        err = vkCreateXlibSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
-    }
+            err = vkCreateXlibSurfaceKHR(m_VulkanInstance->GetVkInstance(), &surfaceCreateInfo, nullptr, &m_VkSurface);
+        }
 #    endif
 
 #endif
+    }
 
     CHECK_VK_ERROR_AND_THROW(err, "Failed to create OS-specific surface");
 

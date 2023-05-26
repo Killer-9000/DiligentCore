@@ -34,6 +34,7 @@ DILIGENT_BEGIN_NAMESPACE(Diligent)
 struct AndroidNativeWindow
 {
     void* pAWindow DEFAULT_INITIALIZER(nullptr);
+    bool isSDL     DEFAULT_INITIALIZER(false);
 };
 
 DILIGENT_END_NAMESPACE // namespace Diligent

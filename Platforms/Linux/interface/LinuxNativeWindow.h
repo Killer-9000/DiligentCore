@@ -37,6 +37,9 @@ struct LinuxNativeWindow
     Uint32 WindowId      DEFAULT_INITIALIZER(0);
     void* pDisplay       DEFAULT_INITIALIZER(nullptr);
     void* pXCBConnection DEFAULT_INITIALIZER(nullptr);
+
+    // SDL
+    void* hWnd DEFAULT_INITIALIZER(nullptr);
 };
 
 DILIGENT_END_NAMESPACE // namespace Diligent

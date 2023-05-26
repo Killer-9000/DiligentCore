@@ -34,13 +34,14 @@ DILIGENT_BEGIN_NAMESPACE(Diligent)
 struct Win32NativeWindow
 {
     void* hWnd DEFAULT_INITIALIZER(nullptr);
+    bool isSDL DEFAULT_INITIALIZER(false);
 
 #if DILIGENT_CPP_INTERFACE
     Win32NativeWindow() noexcept
     {}
 
-    explicit Win32NativeWindow(void* _hWnd) noexcept :
-        hWnd{_hWnd}
+    explicit Win32NativeWindow(void* _hWnd, bool _isSDL = false) noexcept :
+        hWnd{_hWnd}, isSDL{_isSDL}
     {}
 #endif
 };

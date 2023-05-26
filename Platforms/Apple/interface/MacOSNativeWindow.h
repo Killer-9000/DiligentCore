@@ -34,13 +34,14 @@ DILIGENT_BEGIN_NAMESPACE(Diligent)
 struct MacOSNativeWindow
 {
     void* pNSView DEFAULT_INITIALIZER(nullptr);
+    bool isSDL    DEFAULT_INITIALIZER(false);
 
 #if DILIGENT_CPP_INTERFACE
     MacOSNativeWindow() noexcept
     {}
 
-    explicit MacOSNativeWindow(void* _pNSView) noexcept :
-        pNSView(_pNSView)
+    explicit MacOSNativeWindow(void* _pNSView, bool _isSDL = false) noexcept :
+        pNSView(_pNSView), isSDL{_isSDL}
     {}
 #endif
 };

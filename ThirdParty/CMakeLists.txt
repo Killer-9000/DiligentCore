@@ -167,6 +167,11 @@ if (NOT TARGET xxHash::xxhash)
     install(FILES "${xxHash_SOURCE_DIR}/../LICENSE" DESTINATION "Licenses/ThirdParty/${DILIGENT_CORE_DIR}" RENAME xxHash-License.txt)
 endif()
 
+
+if (NOT TARGET SDL2::SDL2-static)
+    add_subdirectory(SDL)
+endif()
+
 install(FILES stb/stb_image_write_license.txt DESTINATION "Licenses/ThirdParty/${DILIGENT_CORE_DIR}")
 install(FILES DirectXShaderCompiler/LICENSE.TXT DESTINATION "Licenses/ThirdParty/${DILIGENT_CORE_DIR}" RENAME DXC-License.txt)
 install(FILES DirectXShaderCompiler/ThirdPartyNotices.txt DESTINATION "Licenses/ThirdParty/${DILIGENT_CORE_DIR}" RENAME DXC-ThirdPartyNotices.txt)

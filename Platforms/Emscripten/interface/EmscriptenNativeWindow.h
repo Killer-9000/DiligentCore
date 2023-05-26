@@ -34,12 +34,14 @@ DILIGENT_BEGIN_NAMESPACE(Diligent)
 struct EmscriptenNativeWindow
 {
     const char* pCanvasId DEFAULT_INITIALIZER(nullptr);
+    bool isSDL            DEFAULT_INITIALIZER(false);
+
 #if DILIGENT_CPP_INTERFACE
     EmscriptenNativeWindow() noexcept
     {}
 
-    explicit EmscriptenNativeWindow(const char* _pCanvasId) noexcept :
-        pCanvasId(_pCanvasId)
+    explicit EmscriptenNativeWindow(const char* _pCanvasId, bool _isSDL = false) noexcept :
+        pCanvasId(_pCanvasId), isSDL{_isSDL}
     {}
 #endif
 };
