@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,6 +33,7 @@
 /// This file must be included after D3D11TypeDefinitions.h or D3D12TypeDefinitions.h
 
 #include "DXGITypeConversions.hpp"
+#include "GraphicsAccessories.hpp"
 
 namespace Diligent
 {
@@ -182,6 +183,15 @@ void TextureViewDesc_to_D3D_DSV_DESC(const TextureViewDesc& DSVDesc, D3D_DEPTH_S
 {
     memset(&d3dDSVDesc, 0, sizeof(d3dDSVDesc));
     d3dDSVDesc.Format = TexFormatToDXGI_Format(DSVDesc.Format, BIND_DEPTH_STENCIL);
+
+    if (DSVDesc.ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL)
+    {
+        d3dDSVDesc.Flags = D3D_DSV_READ_ONLY_DEPTH;
+
+        const bool bHasStencil = GetTextureFormatAttribs(DSVDesc.Format).ComponentType == COMPONENT_TYPE_DEPTH_STENCIL;
+        if (bHasStencil)
+            d3dDSVDesc.Flags |= D3D_DSV_READ_ONLY_STENCIL;
+    }
 
     switch (DSVDesc.TextureDim)
     {

@@ -51,16 +51,17 @@ PUBLIC
     Diligent-GraphicsEngineInterface
 )
 
-if(NOT FILE2STRING_PATH STREQUAL "")
+if(NOT "${FILE2STRING_PATH}" STREQUAL "")
+    find_package(Python3 REQUIRED)
     add_custom_command(OUTPUT ${GLSL_DEFINITIONS_INC} # We must use full path here!
-                       COMMAND ${PYTHON_EXECUTABLE} ${FILE2STRING_PATH} ${GLSL_DEFINITIONS} include/GLSLDefinitions_inc.h
+                       COMMAND ${Python3_EXECUTABLE} ${FILE2STRING_PATH} ${GLSL_DEFINITIONS} include/GLSLDefinitions_inc.h
                        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                        MAIN_DEPENDENCY ${GLSL_DEFINITIONS}
                        COMMENT "Processing GLSLDefinitions.h"
                        VERBATIM
     )
 else()
-    message(WARNING "File2String utility is currently unavailable on this host system. This is not an issues unless you modify GLSLDefinitions.h file")
+    message(WARNING "File2String utility is currently unavailable on this host system. This is not an issue unless you modify GLSLDefinitions.h file")
 endif()
 
 source_group("src" FILES ${SOURCE})

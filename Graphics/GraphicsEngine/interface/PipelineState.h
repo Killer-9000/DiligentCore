@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -152,7 +152,7 @@ struct ShaderResourceVariableDesc
     /// - False otherwise.
     bool operator==(const ShaderResourceVariableDesc& RHS) const noexcept
     {
-        return ShaderStages == RHS.ShaderStages && 
+        return ShaderStages == RHS.ShaderStages &&
                Type         == RHS.Type         &&
                Flags        == RHS.Flags        &&
                SafeStrEqual(Name, RHS.Name);
@@ -222,7 +222,7 @@ struct PipelineResourceLayoutDesc
 #if DILIGENT_CPP_INTERFACE
     /// Returns true if two resource layout descriptions are equal, and false otherwise.
     /// Optionally ignores variable descriptions and/or sampler descriptions.
-    static bool IsEqual(const PipelineResourceLayoutDesc& Desc1, 
+    static bool IsEqual(const PipelineResourceLayoutDesc& Desc1,
                         const PipelineResourceLayoutDesc& Desc2,
                         bool                              IgnoreVariables = false,
                         bool                              IgnoreSamplers  = false)
@@ -314,6 +314,10 @@ struct GraphicsPipelineDesc
     /// Must be TEX_FORMAT_UNKNOWN when pRenderPass is not null.
     TEXTURE_FORMAT DSVFormat     DEFAULT_INITIALIZER(TEX_FORMAT_UNKNOWN);
 
+    /// Indicates that the pipeline will be used with read-only depth-stencil buffer.
+    /// Must be false when pRenderPass is not null.
+    Bool ReadOnlyDSV             DEFAULT_INITIALIZER(False);
+
     /// Multisampling parameters.
     SampleDesc SmplDesc;
 
@@ -340,6 +344,7 @@ struct GraphicsPipelineDesc
               SubpassIndex      == Rhs.SubpassIndex      &&
               ShadingRateFlags  == Rhs.ShadingRateFlags  &&
               DSVFormat         == Rhs.DSVFormat         &&
+              ReadOnlyDSV       == Rhs.ReadOnlyDSV    &&
               SmplDesc          == Rhs.SmplDesc          &&
               NodeMask          == Rhs.NodeMask))
             return false;

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -909,9 +909,9 @@ void DeviceContextVkImpl::DrawMesh(const DrawMeshAttribs& Attribs)
 
     PrepareForDraw(Attribs.Flags);
 
-    if (Attribs.ThreadGroupCount > 0)
+    if (Attribs.ThreadGroupCountX > 0 && Attribs.ThreadGroupCountY > 0 && Attribs.ThreadGroupCountZ > 0)
     {
-        m_CommandBuffer.DrawMesh(Attribs.ThreadGroupCount, 0);
+        m_CommandBuffer.DrawMesh(Attribs.ThreadGroupCountX, Attribs.ThreadGroupCountY, Attribs.ThreadGroupCountZ);
         ++m_State.NumCommands;
     }
 }
@@ -1647,8 +1647,20 @@ void DeviceContextVkImpl::TransitionRenderTargets(RESOURCE_STATE_TRANSITION_MODE
 
     if (m_pBoundDepthStencil)
     {
+        const auto ViewType = m_pBoundDepthStencil->GetDesc().ViewType;
+        VERIFY_EXPR(ViewType == TEXTURE_VIEW_DEPTH_STENCIL || ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL);
+        const bool bReadOnly = ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL;
+
+        const RESOURCE_STATE NewState = bReadOnly ?
+            RESOURCE_STATE_DEPTH_READ :
+            RESOURCE_STATE_DEPTH_WRITE;
+
+        const VkImageLayout ExpectedLayout = bReadOnly ?
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL :
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
         auto* pDepthBufferVk = m_pBoundDepthStencil->GetTexture<TextureVkImpl>();
-        TransitionOrVerifyTextureState(*pDepthBufferVk, StateTransitionMode, RESOURCE_STATE_DEPTH_WRITE, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+        TransitionOrVerifyTextureState(*pDepthBufferVk, StateTransitionMode, NewState, ExpectedLayout,
                                        "Binding depth-stencil buffer (DeviceContextVkImpl::TransitionRenderTargets)");
     }
 
@@ -1708,6 +1720,7 @@ void DeviceContextVkImpl::ChooseRenderPassAndFramebuffer()
         auto* pDepthBuffer        = m_pBoundDepthStencil->GetTexture();
         FBKey.DSV                 = m_pBoundDepthStencil->GetVulkanImageView();
         RenderPassKey.DSVFormat   = m_pBoundDepthStencil->GetDesc().Format;
+        RenderPassKey.ReadOnlyDSV = m_pBoundDepthStencil->GetDesc().ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL;
         RenderPassKey.SampleCount = static_cast<Uint8>(pDepthBuffer->GetDesc().SampleCount);
     }
     else
@@ -1965,7 +1978,7 @@ void DeviceContextVkImpl::MapBuffer(IBuffer* pBuffer, MAP_TYPE MapType, MAP_FLAG
                           BuffDesc.Name, "': Vulkan buffer must be mapped for writing with MAP_FLAG_DISCARD or MAP_FLAG_NO_OVERWRITE flag. Context Id: ", GetContextId());
 
             auto& DynAllocation = pBufferVk->m_DynamicData[GetContextId()];
-            if ((MapFlags & MAP_FLAG_DISCARD) != 0 || DynAllocation.pDynamicMemMgr == nullptr)
+            if ((MapFlags & MAP_FLAG_DISCARD) != 0 || !DynAllocation)
             {
                 DynAllocation = AllocateDynamicSpace(BuffDesc.Size, pBufferVk->m_DynamicOffsetAlignment);
             }
@@ -1985,7 +1998,7 @@ void DeviceContextVkImpl::MapBuffer(IBuffer* pBuffer, MAP_TYPE MapType, MAP_FLAG
                 // Reuse the same allocation
             }
 
-            if (DynAllocation.pDynamicMemMgr != nullptr)
+            if (DynAllocation)
             {
                 auto* CPUAddress = DynAllocation.pDynamicMemMgr->GetCPUAddress();
                 pMappedData      = CPUAddress + DynAllocation.AlignedOffset;
@@ -2449,15 +2462,16 @@ void DeviceContextVkImpl::MapTextureSubresource(ITexture*                 pTextu
         {
             Alignment = std::max(Alignment, VkDeviceSize{FmtAttribs.ComponentSize});
         }
-        auto Allocation = AllocateDynamicSpace(CopyInfo.MemorySize, static_cast<Uint32>(Alignment));
+        if (auto Allocation = AllocateDynamicSpace(CopyInfo.MemorySize, static_cast<Uint32>(Alignment)))
+        {
+            MappedData.pData       = reinterpret_cast<Uint8*>(Allocation.pDynamicMemMgr->GetCPUAddress()) + Allocation.AlignedOffset;
+            MappedData.Stride      = CopyInfo.RowStride;
+            MappedData.DepthStride = CopyInfo.DepthStride;
 
-        MappedData.pData       = reinterpret_cast<Uint8*>(Allocation.pDynamicMemMgr->GetCPUAddress()) + Allocation.AlignedOffset;
-        MappedData.Stride      = CopyInfo.RowStride;
-        MappedData.DepthStride = CopyInfo.DepthStride;
-
-        auto it = m_MappedTextures.emplace(MappedTextureKey{&TextureVk, MipLevel, ArraySlice}, MappedTexture{CopyInfo, std::move(Allocation)});
-        if (!it.second)
-            LOG_ERROR_MESSAGE("Mip level ", MipLevel, ", slice ", ArraySlice, " of texture '", TexDesc.Name, "' has already been mapped");
+            auto it = m_MappedTextures.emplace(MappedTextureKey{&TextureVk, MipLevel, ArraySlice}, MappedTexture{CopyInfo, std::move(Allocation)});
+            if (!it.second)
+                LOG_ERROR_MESSAGE("Mip level ", MipLevel, ", slice ", ArraySlice, " of texture '", TexDesc.Name, "' has already been mapped");
+        }
     }
     else if (TexDesc.Usage == USAGE_STAGING)
     {

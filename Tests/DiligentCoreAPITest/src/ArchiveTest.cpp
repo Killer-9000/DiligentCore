@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -47,6 +47,8 @@ using namespace Diligent::Testing;
 
 namespace
 {
+
+static constexpr Uint32 ContentVersion = 1234;
 
 constexpr ARCHIVE_DEVICE_DATA_FLAGS GetDeviceBits()
 {
@@ -174,7 +176,7 @@ void ArchivePRS(RefCntAutoPtr<IDataBlob>&                  pArchive,
         ASSERT_NE(pRefPRS_2, nullptr);
     }
 
-    pArchiver->SerializeToBlob(&pArchive);
+    pArchiver->SerializeToBlob(ContentVersion, &pArchive);
     ASSERT_NE(pArchive, nullptr);
 }
 
@@ -195,7 +197,7 @@ void UnpackPRS(IDataBlob*                  pArchive,
 
     ASSERT_NE(pArchive, nullptr);
     EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
-    pDearchiver->LoadArchive(pArchive);
+    pDearchiver->LoadArchive(pArchive, ContentVersion);
 
     // Unpack PRS 1
     {
@@ -396,9 +398,6 @@ TEST_P(TestBrokenShader, CompileFailure)
     ShaderCI.EntryPoint = "main";
     ShaderCI.Source     = "Not even a shader source";
 
-    RefCntAutoPtr<IDataBlob> pCompilerOutput;
-    ShaderCI.ppCompilerOutput = pCompilerOutput.RawDblPtr();
-
     const auto IsD3D = DataFlag == ARCHIVE_DEVICE_DATA_FLAG_D3D11 || DataFlag == ARCHIVE_DEVICE_DATA_FLAG_D3D12;
     pEnv->SetErrorAllowance(IsD3D ? 2 : 3, "No worries, errors are expected: testing broken shader\n");
     pEnv->PushExpectedErrorSubstring("Failed to create Shader object 'Archive test broken shader'");
@@ -406,8 +405,9 @@ TEST_P(TestBrokenShader, CompileFailure)
     if (!IsD3D)
         pEnv->PushExpectedErrorSubstring("Failed to parse shader source", false);
 
-    RefCntAutoPtr<IShader> pSerializedShader;
-    pSerializationDevice->CreateShader(ShaderCI, ShaderArchiveInfo{DataFlag}, &pSerializedShader);
+    RefCntAutoPtr<IShader>   pSerializedShader;
+    RefCntAutoPtr<IDataBlob> pCompilerOutput;
+    pSerializationDevice->CreateShader(ShaderCI, ShaderArchiveInfo{DataFlag}, &pSerializedShader, &pCompilerOutput);
     EXPECT_EQ(pSerializedShader, nullptr);
     EXPECT_NE(pCompilerOutput, nullptr);
 }
@@ -963,11 +963,11 @@ void TestGraphicsPipeline(PSO_ARCHIVE_FLAGS ArchiveFlags)
         }
 
         RefCntAutoPtr<IDataBlob> pArchive;
-        pArchiver->SerializeToBlob(&pArchive);
+        pArchiver->SerializeToBlob(ContentVersion, &pArchive);
         ASSERT_NE(pArchive, nullptr);
 
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
-        pDearchiver->LoadArchive(pArchive);
+        pDearchiver->LoadArchive(pArchive, ContentVersion);
     }
 
     // Unpack Render pass
@@ -1197,11 +1197,11 @@ TEST(ArchiveTest, Shaders)
     EXPECT_EQ(pArchiver->GetShader("Non-existing shader name"), nullptr);
 
     RefCntAutoPtr<IDataBlob> pArchive;
-    pArchiver->SerializeToBlob(&pArchive);
+    pArchiver->SerializeToBlob(ContentVersion, &pArchive);
     ASSERT_NE(pArchive, nullptr);
     EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
 
-    pDearchiver->LoadArchive(pArchive);
+    pDearchiver->LoadArchive(pArchive, ContentVersion);
 
     auto UnpackShader = [](IRenderDevice* pDevice, IDearchiver* pDearchiver, const ShaderCreateInfo& CI) {
         RefCntAutoPtr<IShader> pUnpackedShader;
@@ -1379,7 +1379,7 @@ void TestComputePipeline(PSO_ARCHIVE_FLAGS ArchiveFlags)
             EXPECT_EQ(pArchiver->GetPipelineState(PIPELINE_TYPE_COMPUTE, "Non-existing PSO name"), nullptr);
 
             {
-                pArchiver->SerializeToBlob(&pArchive);
+                pArchiver->SerializeToBlob(ContentVersion, &pArchive);
                 ASSERT_NE(pArchive, nullptr);
                 EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
             }
@@ -1389,15 +1389,15 @@ void TestComputePipeline(PSO_ARCHIVE_FLAGS ArchiveFlags)
                 pArchiver->Reset();
                 ASSERT_TRUE(pArchiver->AddPipelineResourceSignature(pSerializedPRS));
 
-                pArchiver->SerializeToBlob(&pSignArchive);
+                pArchiver->SerializeToBlob(ContentVersion, &pSignArchive);
                 ASSERT_NE(pSignArchive, nullptr);
                 EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pSignArchive));
             }
         }
 
-        pDearchiver->LoadArchive(pArchive);
+        pDearchiver->LoadArchive(pArchive, ContentVersion);
         if (pSignArchive)
-            pDearchiver->LoadArchive(pSignArchive);
+            pDearchiver->LoadArchive(pSignArchive, ContentVersion);
     }
 
     // Unpack PSO
@@ -1599,11 +1599,11 @@ TEST(ArchiveTest, RayTracingPipeline)
             EXPECT_EQ(pArchiver->GetPipelineState(PIPELINE_TYPE_RAY_TRACING, "Non-existing PSO name"), nullptr);
         }
         RefCntAutoPtr<IDataBlob> pArchive;
-        pArchiver->SerializeToBlob(&pArchive);
+        pArchiver->SerializeToBlob(ContentVersion, &pArchive);
         ASSERT_NE(pArchive, nullptr);
 
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
-        pDearchiver->LoadArchive(pArchive);
+        pDearchiver->LoadArchive(pArchive, ContentVersion);
     }
 
     // Unpack PSO
@@ -2212,7 +2212,7 @@ TEST_P(TestSamplers, GraphicsPipeline)
             for (Uint32 i = 0; i < DynamicTexArraySize; ++i)
                 Macros.AddShaderMacro((std::string{"Tex2DArr_Dyn_Ref"} + std::to_string(i)).c_str(), RefTextures.GetColor(Tex2DArr_DynIdx[s] + i));
 
-            return static_cast<const ShaderMacro*>(Macros);
+            return static_cast<ShaderMacroArray>(Macros);
         };
 
         RefCntAutoPtr<IShaderSourceInputStreamFactory> pShaderSourceFactory;
@@ -2382,11 +2382,11 @@ TEST_P(TestSamplers, GraphicsPipeline)
         EXPECT_EQ(pArchiver->GetPipelineState(PSOCreateInfo.PSODesc.PipelineType, PSOCreateInfo.PSODesc.Name), pSerializedPSO);
 
         RefCntAutoPtr<IDataBlob> pArchive;
-        pArchiver->SerializeToBlob(&pArchive);
+        pArchiver->SerializeToBlob(ContentVersion, &pArchive);
         ASSERT_NE(pArchive, nullptr);
 
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pArchive));
-        pDearchiver->LoadArchive(pArchive);
+        pDearchiver->LoadArchive(pArchive, ContentVersion);
     }
 
     RefCntAutoPtr<IPipelineState> pPSO;
@@ -2538,7 +2538,7 @@ TEST(ArchiveTest, MergeArchives)
 
         EXPECT_TRUE(pArchiver->AddShader(pSerCS));
 
-        pArchiver->SerializeToBlob(&pShaderArchive1);
+        pArchiver->SerializeToBlob(ContentVersion, &pShaderArchive1);
         ASSERT_NE(pShaderArchive1, nullptr);
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pShaderArchive1));
 
@@ -2558,7 +2558,7 @@ TEST(ArchiveTest, MergeArchives)
         EXPECT_TRUE(pArchiver->AddShader(pSerVS));
         EXPECT_TRUE(pArchiver->AddShader(pSerPS));
 
-        pArchiver->SerializeToBlob(&pShaderArchive2);
+        pArchiver->SerializeToBlob(ContentVersion, &pShaderArchive2);
         ASSERT_NE(pShaderArchive2, nullptr);
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pShaderArchive2));
 
@@ -2597,16 +2597,26 @@ TEST(ArchiveTest, MergeArchives)
 
         EXPECT_TRUE(pArchiver->AddPipelineState(pSerializedPSO));
 
-        pArchiver->SerializeToBlob(&pGraphicsArchive);
+        pArchiver->SerializeToBlob(ContentVersion, &pGraphicsArchive);
         ASSERT_NE(pGraphicsArchive, nullptr);
         EXPECT_TRUE(pArchiverFactory->PrintArchiveContent(pGraphicsArchive));
     }
 
 
     RefCntAutoPtr<IDataBlob> pArchive;
-    const IDataBlob*         ppArchives[] = {pPRSArchive1, pPRSArchive2, pShaderArchive1, pShaderArchive2, pGraphicsArchive};
-    pArchiverFactory->MergeArchives(ppArchives, _countof(ppArchives), &pArchive);
-    ASSERT_NE(pArchive, nullptr);
+    {
+        const IDataBlob* ppArchives[] = {pPRSArchive1, pPRSArchive2, pShaderArchive1, pShaderArchive2, pGraphicsArchive};
+        pArchiverFactory->MergeArchives(ppArchives, _countof(ppArchives), &pArchive);
+        ASSERT_NE(pArchive, nullptr);
+    }
+
+    {
+        // Duplicate resources should be silently ignored
+        RefCntAutoPtr<IDataBlob> pArchive2;
+        const IDataBlob*         ppArchives[] = {pArchive, pPRSArchive1, pPRSArchive2, pShaderArchive1, pShaderArchive2, pGraphicsArchive};
+        pArchiverFactory->MergeArchives(ppArchives, _countof(ppArchives), &pArchive2);
+        EXPECT_NE(pArchive2, nullptr);
+    }
 
     pPRSArchive1.Release();
     pPRSArchive2.Release();
@@ -2614,7 +2624,7 @@ TEST(ArchiveTest, MergeArchives)
     pShaderArchive2.Release();
     pGraphicsArchive.Release();
 
-    pDearchiver->LoadArchive(pArchive);
+    pDearchiver->LoadArchive(pArchive, ContentVersion);
 
     UnpackPRS(pArchive, PRS1Name, PRS2Name, pRefPRS_1, pRefPRS_2);
 

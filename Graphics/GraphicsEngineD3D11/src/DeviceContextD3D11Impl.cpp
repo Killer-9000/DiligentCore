@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -1496,17 +1496,23 @@ void DeviceContextD3D11Impl::SetRenderTargetsExt(const SetRenderTargetsAttribs& 
 
         if (m_pBoundDepthStencil)
         {
+            const auto ViewType = m_pBoundDepthStencil->GetDesc().ViewType;
+            VERIFY_EXPR(ViewType == TEXTURE_VIEW_DEPTH_STENCIL || ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL);
+            const RESOURCE_STATE NewState = ViewType == TEXTURE_VIEW_DEPTH_STENCIL ?
+                RESOURCE_STATE_DEPTH_WRITE :
+                RESOURCE_STATE_DEPTH_READ;
+
             auto* pTex = m_pBoundDepthStencil->GetTexture<TextureBaseD3D11>();
             if (Attribs.StateTransitionMode == RESOURCE_STATE_TRANSITION_MODE_TRANSITION)
             {
                 UnbindTextureFromInput(*pTex, pTex->GetD3D11Texture());
                 if (pTex->IsInKnownState())
-                    pTex->SetState(RESOURCE_STATE_DEPTH_WRITE);
+                    pTex->SetState(NewState);
             }
 #ifdef DILIGENT_DEVELOPMENT
             else if (Attribs.StateTransitionMode == RESOURCE_STATE_TRANSITION_MODE_VERIFY)
             {
-                DvpVerifyTextureState(*pTex, RESOURCE_STATE_DEPTH_WRITE, "Setting depth-stencil buffer (DeviceContextD3D11Impl::SetRenderTargets)");
+                DvpVerifyTextureState(*pTex, NewState, "Setting depth-stencil buffer (DeviceContextD3D11Impl::SetRenderTargets)");
             }
 #endif
         }
@@ -2022,7 +2028,7 @@ static void AliasingBarrier(ID3D11DeviceContext* pd3d11Ctx, IDeviceObject* pReso
     {
         if (RefCntAutoPtr<ITextureD3D11> pTexture{pResource, IID_TextureD3D11})
         {
-            const auto* pTexD3D11 = pTexture.RawPtr<const TextureBaseD3D11>();
+            const auto* pTexD3D11 = pTexture.ConstPtr<TextureBaseD3D11>();
             if (pTexD3D11->IsUsingNVApi())
                 UseNVApi = true;
             return pTexture->GetD3D11Texture();

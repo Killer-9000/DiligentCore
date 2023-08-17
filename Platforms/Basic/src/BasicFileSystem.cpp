@@ -207,6 +207,24 @@ std::vector<String> BasicFileSystem::SplitPath(const Char* Path, bool Simplify)
     return Diligent::SplitPath<String>(Path, Simplify);
 }
 
+std::string BasicFileSystem::BuildPathFromComponents(const std::vector<String>& Components, Char Slash)
+{
+    if (Slash != 0)
+        DEV_CHECK_ERR(IsSlash(Slash), "Incorrect slash symbol");
+    else
+        Slash = SlashSymbol;
+
+    std::string Path;
+    for (const auto& Cmp : Components)
+    {
+        if (!Path.empty())
+            Path += Slash;
+        Path += Cmp;
+    }
+
+    return Path;
+}
+
 std::string BasicFileSystem::SimplifyPath(const Char* Path, Char Slash)
 {
     if (Path == nullptr)
@@ -322,6 +340,12 @@ std::string BasicFileSystem::GetRelativePath(const Char* PathFrom,
 std::string BasicFileSystem::FileDialog(const FileDialogAttribs& DialogAttribs)
 {
     LOG_WARNING_MESSAGE("File dialog is not implemented on this platform");
+    return "";
+}
+
+std::string BasicFileSystem::OpenFolderDialog(const char* Title)
+{
+    LOG_WARNING_MESSAGE("Open folder dialog is not implemented on this platform");
     return "";
 }
 

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -62,7 +62,7 @@ bool VerifyDispatchComputeAttribs        (const DispatchComputeAttribs&         
 bool VerifyDispatchComputeIndirectAttribs(const DispatchComputeIndirectAttribs& Attribs);
 // clang-format on
 
-bool VerifyDrawMeshAttribs(Uint32 MaxDrawMeshTasksCount, const DrawMeshAttribs& Attribs);
+bool VerifyDrawMeshAttribs(const MeshShaderProperties& MeshShaderProps, const DrawMeshAttribs& Attribs);
 bool VerifyDrawMeshIndirectAttribs(const DrawMeshIndirectAttribs& Attribs, Uint32 IndirectCmdStride);
 
 bool VerifyResolveTextureSubresourceAttribs(const ResolveTextureSubresourceAttribs& ResolveAttribs,
@@ -286,7 +286,7 @@ public:
     /// Implementation of IDeviceContext::GetUserData.
     virtual IObject* DILIGENT_CALL_TYPE GetUserData() const override final
     {
-        return m_pUserData.RawPtr<IObject>();
+        return m_pUserData;
     }
 
     /// Base implementation of IDeviceContext::DispatchTile.
@@ -1018,8 +1018,9 @@ inline bool DeviceContextBase<ImplementationTraits>::SetRenderTargets(const SetR
     {
         const auto& DSVDesc = Attribs.pDepthStencil->GetDesc();
         const auto& TexDesc = Attribs.pDepthStencil->GetTexture()->GetDesc();
-        DEV_CHECK_ERR(DSVDesc.ViewType == TEXTURE_VIEW_DEPTH_STENCIL,
-                      "Texture view object named '", DSVDesc.Name ? DSVDesc.Name : "", "' has incorrect view type (", GetTexViewTypeLiteralName(DSVDesc.ViewType), "). Depth stencil view is expected");
+        DEV_CHECK_ERR(DSVDesc.ViewType == TEXTURE_VIEW_DEPTH_STENCIL || DSVDesc.ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL,
+                      "Texture view object named '", DSVDesc.Name ? DSVDesc.Name : "", "' has incorrect view type (", GetTexViewTypeLiteralName(DSVDesc.ViewType),
+                      "). Depth-stencil or read-only depth-stencil view is expected");
         DEV_CHECK_ERR(m_pBoundFramebuffer || (TexDesc.MiscFlags & MISC_TEXTURE_FLAG_MEMORYLESS) == 0,
                       "Memoryless depth buffer '", TexDesc.Name, "' must be used within a framebuffer");
 
@@ -1174,7 +1175,9 @@ inline bool DeviceContextBase<ImplementationTraits>::SetSubpassRenderTargets()
         if (DSAttachmentRef.AttachmentIndex != ATTACHMENT_UNUSED)
         {
             VERIFY_EXPR(DSAttachmentRef.AttachmentIndex < RPDesc.AttachmentCount);
-            pDSV = FBDesc.ppAttachments[DSAttachmentRef.AttachmentIndex];
+            pDSV = DSAttachmentRef.State == RESOURCE_STATE_DEPTH_READ ?
+                m_pBoundFramebuffer->GetReadOnlyDSV(m_SubpassIndex) :
+                FBDesc.ppAttachments[DSAttachmentRef.AttachmentIndex];
             if (pDSV != nullptr)
             {
                 if (m_FramebufferSamples == 0)
@@ -2169,7 +2172,7 @@ inline void DeviceContextBase<ImplementationTraits>::DvpVerifyDrawMeshArguments(
                   "DrawMesh command arguments are invalid: pipeline state '",
                   m_pPipelineState->GetDesc().Name, "' is not a mesh pipeline.");
 
-    DEV_CHECK_ERR(VerifyDrawMeshAttribs(m_pDevice->GetAdapterInfo().MeshShader.MaxTaskCount, Attribs), "DrawMeshAttribs are invalid");
+    DEV_CHECK_ERR(VerifyDrawMeshAttribs(m_pDevice->GetAdapterInfo().MeshShader, Attribs), "DrawMeshAttribs are invalid");
 }
 
 template <typename ImplementationTraits>

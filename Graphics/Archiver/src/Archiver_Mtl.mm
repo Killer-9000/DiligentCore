@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -288,18 +288,18 @@ struct CompiledShaderMtl final : SerializedShaderImpl::CompiledShader
 
     virtual SerializedData Serialize(ShaderCreateInfo ShaderCI) const override final
     {
-        const auto& Source = ShaderMtl.GetMslData().Source;
-        
+        SerializedData ShaderData = SerializeMslSourceAndMtlArchiveData(ShaderMtl);
+
         ShaderCI.FilePath       = nullptr;
-        ShaderCI.ByteCode       = nullptr;
-        ShaderCI.Macros         = nullptr;
+        ShaderCI.Source         = nullptr;
+        ShaderCI.Macros         = {};
         ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_MSL_VERBATIM;
-        ShaderCI.Source         = Source.c_str();
-        ShaderCI.SourceLength   = Source.length();
-        
+        ShaderCI.ByteCode       = ShaderData.Ptr();
+        ShaderCI.ByteCodeSize   = ShaderData.Size();
+
         return SerializedShaderImpl::SerializeCreateInfo(ShaderCI);
     }
-    
+
     virtual IShader* GetDeviceShader() override final
     {
         return &ShaderMtl;
@@ -434,30 +434,25 @@ SerializedData CompileMtlShader(const CompileMtlShaderAttribs& Attribs) noexcept
         LOG_PATCH_SHADER_ERROR_AND_THROW("Failed to read Metal shader library.");
 
 #undef LOG_PATCH_SHADER_ERROR_AND_THROW
-    
-    ShaderMtlImpl::ArchiveData ShaderMtlArchiveData{
+
+    // Pack shader Mtl acrhive data into the byte code.
+    // The data is unpacked by DearchiverMtlImpl::UnpackShader().
+    const ShaderMtlImpl::ArchiveData ShaderMtlArchiveData{
         std::move(ParsedMsl.BufferInfoMap),
         MslData.ComputeGroupSize,
         IORemapping
-    };
-    
-    auto SerializeShaderData = [&](auto& Ser){
-        Ser.SerializeBytes(pByteCode->GetConstDataPtr(), pByteCode->GetSize());
-        ShaderMtlImpl::ArchiveData ArchiveData;
-        constexpr auto SerMode = std::remove_reference<decltype(Ser)>::type::GetMode();
-        ShaderMtlSerializer<SerMode>::SerializeArchiveData(Ser, ShaderMtlArchiveData);
     };
 
     SerializedData ShaderData;
     {
         Serializer<SerializerMode::Measure> Ser;
-        SerializeShaderData(Ser);
+        ShaderMtlSerializer<SerializerMode::Measure>::SerializeBytecode(Ser, pByteCode->GetConstDataPtr(), pByteCode->GetSize(), ShaderMtlArchiveData);
         ShaderData = Ser.AllocateData(GetRawAllocator());
     }
 
     {
         Serializer<SerializerMode::Write> Ser{ShaderData};
-        SerializeShaderData(Ser);
+        ShaderMtlSerializer<SerializerMode::Write>::SerializeBytecode(Ser, pByteCode->GetConstDataPtr(), pByteCode->GetSize(), ShaderMtlArchiveData);
         VERIFY_EXPR(Ser.IsEnded());
     }
 
@@ -543,7 +538,7 @@ void SerializedPipelineStateImpl::PatchShadersMtl(const CreateInfoType& CreateIn
             auto ShaderCI           = Stage.pShader->GetCreateInfo();
             ShaderCI.Source         = nullptr;
             ShaderCI.FilePath       = nullptr;
-            ShaderCI.Macros         = nullptr;
+            ShaderCI.Macros         = {};
             ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_MTLB;
             ShaderCI.ByteCode       = ShaderData.Ptr();
             ShaderCI.ByteCodeSize   = ShaderData.Size();
@@ -556,18 +551,26 @@ void SerializedPipelineStateImpl::PatchShadersMtl(const CreateInfoType& CreateIn
 INSTANTIATE_PATCH_SHADER_METHODS(PatchShadersMtl, DeviceType DevType, const std::string& DumpDir)
 INSTANTIATE_DEVICE_SIGNATURE_METHODS(PipelineResourceSignatureMtlImpl)
 
-void SerializedShaderImpl::CreateShaderMtl(IReferenceCounters* pRefCounters, const ShaderCreateInfo& ShaderCI, DeviceType Type) noexcept(false)
+void SerializedShaderImpl::CreateShaderMtl(IReferenceCounters*     pRefCounters,
+                                           const ShaderCreateInfo& ShaderCI,
+                                           DeviceType              Type,
+                                           IDataBlob**             ppCompilerOutput) noexcept(false)
 {
     const auto& DeviceInfo       = m_pDevice->GetDeviceInfo();
     const auto& AdapterInfo      = m_pDevice->GetAdapterInfo();
     const auto& MtlProps         = m_pDevice->GetMtlProperties();
     auto*       pRenderDeviceMtl = m_pDevice->GetRenderDevice(RENDER_DEVICE_TYPE_METAL);
-        
+
     ShaderMtlImpl::CreateInfo MtlShaderCI
     {
         DeviceInfo,
         AdapterInfo,
         nullptr, // pDearchiveData
+
+        // Do not overwrite compiler output from other APIs.
+        // TODO: collect all outputs.
+        ppCompilerOutput == nullptr || *ppCompilerOutput == nullptr ? ppCompilerOutput : nullptr,
+
         std::function<void(std::string&)>{
             [&](std::string& MslSource)
             {
@@ -575,7 +578,7 @@ void SerializedShaderImpl::CreateShaderMtl(IReferenceCounters* pRefCounters, con
             }
         }
     };
-    
+
     CreateShader<CompiledShaderMtl>(Type, pRefCounters, ShaderCI, MtlShaderCI, pRenderDeviceMtl);
 }
 

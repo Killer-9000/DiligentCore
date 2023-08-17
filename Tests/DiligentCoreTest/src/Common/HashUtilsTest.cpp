@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -1142,7 +1142,7 @@ TEST(Common_HashUtils, VersionXXH128Hash)
 
 TEST(XXH128HasherTest, ShaderCreateInfo)
 {
-    ASSERT_SIZEOF64(ShaderCreateInfo, 144, "Did you add new members to ShaderCreateInfo? Please update the tests.");
+    ASSERT_SIZEOF64(ShaderCreateInfo, 136, "Did you add new members to ShaderCreateInfo? Please update the tests.");
     XXH128HasherTestHelper<ShaderCreateInfo> Helper{"ShaderCreateInfo"};
 
     TEST_STRINGS(Source, "Source1", "Source2", "Source3");
@@ -1164,9 +1164,9 @@ TEST(XXH128HasherTest, ShaderCreateInfo)
         {"Macro1", "Def1"},
         {"Macro2", "Def2"},
         {"Macro3", "Def3"},
-        {},
     };
-    TEST_VALUE(Macros, Macros);
+    Helper.Get().Macros = {Macros, _countof(Macros)};
+
     TEST_BOOL(Desc.UseCombinedTextureSamplers);
 
     TEST_STRINGS(Desc.CombinedSamplerSuffix, "_sampler1", "_sampler2", "_sampler3");

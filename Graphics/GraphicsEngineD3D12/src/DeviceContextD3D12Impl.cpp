@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -794,9 +794,9 @@ void DeviceContextD3D12Impl::DrawMesh(const DrawMeshAttribs& Attribs)
     auto& GraphCtx = GetCmdContext().AsGraphicsContext6();
     PrepareForDraw(GraphCtx, Attribs.Flags);
 
-    if (Attribs.ThreadGroupCount > 0)
+    if (Attribs.ThreadGroupCountX > 0 && Attribs.ThreadGroupCountY > 0 && Attribs.ThreadGroupCountZ > 0)
     {
-        GraphCtx.DrawMesh(Attribs.ThreadGroupCount, 1, 1);
+        GraphCtx.DrawMesh(Attribs.ThreadGroupCountX, Attribs.ThreadGroupCountY, Attribs.ThreadGroupCountZ);
         ++m_State.NumCommands;
     }
 }
@@ -1262,18 +1262,23 @@ void DeviceContextD3D12Impl::CommitRenderTargets(RESOURCE_STATE_TRANSITION_MODE 
 
     if (pDSV)
     {
-        auto* pTexture = ClassPtrCast<TextureD3D12Impl>(pDSV->GetTexture());
-        //if (bReadOnlyDepth)
-        //{
-        //  TransitionResource(*pTexture, D3D12_RESOURCE_STATE_DEPTH_READ);
-        //  m_pCommandList->OMSetRenderTargets( NumRTVs, RTVHandles, FALSE, &DSV->GetDSV_DepthReadOnly() );
-        //}
-        //else
+        const auto ViewType = m_pBoundDepthStencil->GetDesc().ViewType;
+        VERIFY_EXPR(ViewType == TEXTURE_VIEW_DEPTH_STENCIL || ViewType == TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL);
+        auto NewState = ViewType == TEXTURE_VIEW_DEPTH_STENCIL ?
+            RESOURCE_STATE_DEPTH_WRITE :
+            RESOURCE_STATE_DEPTH_READ;
+        if (NewState == RESOURCE_STATE_DEPTH_READ && StateTransitionMode == RESOURCE_STATE_TRANSITION_MODE_TRANSITION)
         {
-            TransitionOrVerifyTextureState(CmdCtx, *pTexture, StateTransitionMode, RESOURCE_STATE_DEPTH_WRITE, "Setting depth-stencil buffer (DeviceContextD3D12Impl::CommitRenderTargets)");
-            DSVHandle = pDSV->GetCPUDescriptorHandle();
-            VERIFY_EXPR(DSVHandle.ptr != 0);
+            // Read-only depth is likely to be used as shader resource, so set this flag.
+            // If this is not intended, the app should manually transition resource states.
+            NewState |= RESOURCE_STATE_SHADER_RESOURCE;
         }
+
+        auto* pTexture = ClassPtrCast<TextureD3D12Impl>(pDSV->GetTexture());
+
+        TransitionOrVerifyTextureState(CmdCtx, *pTexture, StateTransitionMode, NewState, "Setting depth-stencil buffer (DeviceContextD3D12Impl::CommitRenderTargets)");
+        DSVHandle = pDSV->GetCPUDescriptorHandle();
+        VERIFY_EXPR(DSVHandle.ptr != 0);
     }
 
     if (NumRenderTargets > 0 || DSVHandle.ptr != 0)
@@ -1482,10 +1487,13 @@ void DeviceContextD3D12Impl::CommitSubpassRenderTargets()
 
         const auto& DSAttachmentRef = *Subpass.pDepthStencilAttachment;
         VERIFY_EXPR(Subpass.pDepthStencilAttachment != nullptr && DSAttachmentRef.AttachmentIndex != ATTACHMENT_UNUSED);
-        VERIFY(m_pBoundDepthStencil == FBDesc.ppAttachments[DSAttachmentRef.AttachmentIndex],
-               "Depth-stencil buffer in the device context is inconsistent with the framebuffer");
         const auto  FirstLastUse     = m_pActiveRenderPass->GetAttachmentFirstLastUse(DSAttachmentRef.AttachmentIndex);
         const auto& DSAttachmentDesc = RPDesc.pAttachments[DSAttachmentRef.AttachmentIndex];
+        VERIFY(m_pBoundDepthStencil ==
+                   (DSAttachmentRef.State == RESOURCE_STATE_DEPTH_READ ?
+                        m_pBoundFramebuffer->GetReadOnlyDSV(m_SubpassIndex) :
+                        FBDesc.ppAttachments[DSAttachmentRef.AttachmentIndex]),
+               "Depth-stencil buffer in the device context is inconsistent with the framebuffer");
 
         RenderPassDS.cpuDescriptor = m_pBoundDepthStencil->GetCPUDescriptorHandle();
         if (FirstLastUse.first == m_SubpassIndex)
@@ -2250,29 +2258,51 @@ void DeviceContextD3D12Impl::GenerateMips(ITextureView* pTexView)
 {
     TDeviceContextBase::GenerateMips(pTexView);
 
-    PipelineStateD3D12Impl* pCurrPSO = nullptr;
-    if (m_pPipelineState)
-    {
-        const auto& PSODesc = m_pPipelineState->GetDesc();
-        if (PSODesc.IsComputePipeline() || PSODesc.IsRayTracingPipeline())
-        {
-            // Mips generator will set its own compute pipeline, root signature and root resources.
-            // We need to invalidate current PSO and reset it afterwards.
-            pCurrPSO = m_pPipelineState;
-            m_pPipelineState.Release();
-            m_ComputeResources.pd3d12RootSig = nullptr;
-        }
-    }
-
     auto& Ctx = GetCmdContext();
 
     const auto& MipsGenerator = m_pDevice->GetMipsGenerator();
     MipsGenerator.GenerateMips(m_pDevice->GetD3D12Device(), ClassPtrCast<TextureViewD3D12Impl>(pTexView), Ctx);
     ++m_State.NumCommands;
 
-    if (pCurrPSO != nullptr)
+    // Invalidate compute resources as they were set by the mips generator
+    m_ComputeResources.MakeAllStale();
+
+    if (m_pPipelineState)
     {
-        SetPipelineState(pCurrPSO);
+        // Restore previous PSO and root signature
+        const auto& PSODesc = m_pPipelineState->GetDesc();
+        static_assert(PIPELINE_TYPE_LAST == 4, "Please update the switch below to handle the new pipeline type");
+        switch (PSODesc.PipelineType)
+        {
+            case PIPELINE_TYPE_GRAPHICS:
+            {
+                Ctx.SetPipelineState(m_pPipelineState->GetD3D12PipelineState());
+                // No need to restore graphics signature as it is not changed
+            }
+            break;
+
+            case PIPELINE_TYPE_COMPUTE:
+            {
+                auto& CompCtx = Ctx.AsComputeContext();
+                CompCtx.SetPipelineState(m_pPipelineState->GetD3D12PipelineState());
+                CompCtx.SetComputeRootSignature(m_ComputeResources.pd3d12RootSig);
+            }
+            break;
+
+            case PIPELINE_TYPE_RAY_TRACING:
+            {
+                auto& RTCtx = Ctx.AsGraphicsContext4();
+                RTCtx.SetRayTracingPipelineState(m_pPipelineState->GetD3D12StateObject());
+                RTCtx.SetComputeRootSignature(m_ComputeResources.pd3d12RootSig);
+            }
+            break;
+
+            case PIPELINE_TYPE_TILE:
+                UNEXPECTED("Unsupported pipeline type");
+                break;
+            default:
+                UNEXPECTED("Unknown pipeline type");
+        }
     }
 }
 
@@ -2370,7 +2400,7 @@ static void AliasingBarrier(CommandContext& CmdCtx, IDeviceObject* pResourceBefo
     {
         if (RefCntAutoPtr<ITextureD3D12> pTexture{pResource, IID_TextureD3D12})
         {
-            const auto* pTexD3D12 = pTexture.RawPtr<const TextureD3D12Impl>();
+            const auto* pTexD3D12 = pTexture.ConstPtr<TextureD3D12Impl>();
             if (pTexD3D12->IsUsingNVApi())
                 UseNVApi = true;
             return pTexD3D12->GetD3D12Texture();

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -75,7 +75,7 @@ protected:
 
         std::vector<IPipelineResourceSignature*> Signatures;
         for (auto& pPRS : pSignatures)
-            Signatures.push_back(pPRS.RawPtr<IPipelineResourceSignature>());
+            Signatures.push_back(pPRS);
 
         PSOCreateInfo.ppResourceSignatures    = Signatures.data();
         PSOCreateInfo.ResourceSignaturesCount = static_cast<Uint32>(Signatures.size());
@@ -102,12 +102,12 @@ protected:
     }
 
     template <typename ModifyCIHandlerType>
-    static RefCntAutoPtr<IShader> CreateShaderFromFile(SHADER_TYPE           ShaderType,
-                                                       const char*           File,
-                                                       const char*           EntryPoint,
-                                                       const char*           Name,
-                                                       const ShaderMacro*    Macros,
-                                                       ModifyCIHandlerType&& ModifyCIHandler)
+    static RefCntAutoPtr<IShader> CreateShaderFromFile(SHADER_TYPE             ShaderType,
+                                                       const char*             File,
+                                                       const char*             EntryPoint,
+                                                       const char*             Name,
+                                                       const ShaderMacroArray& Macros,
+                                                       ModifyCIHandlerType&&   ModifyCIHandler)
     {
         auto* pEnv    = GPUTestingEnvironment::GetInstance();
         auto* pDevice = pEnv->GetDevice();
@@ -131,20 +131,20 @@ protected:
         return pShader;
     }
 
-    static RefCntAutoPtr<IShader> CreateShaderFromFile(SHADER_TYPE        ShaderType,
-                                                       const char*        File,
-                                                       const char*        EntryPoint,
-                                                       const char*        Name,
-                                                       const ShaderMacro* Macros = nullptr)
+    static RefCntAutoPtr<IShader> CreateShaderFromFile(SHADER_TYPE             ShaderType,
+                                                       const char*             File,
+                                                       const char*             EntryPoint,
+                                                       const char*             Name,
+                                                       const ShaderMacroArray& Macros = {})
     {
         return CreateShaderFromFile(ShaderType, File, EntryPoint, Name, Macros, [&](ShaderCreateInfo& ShaderCI) {});
     }
 
-    static RefCntAutoPtr<IShader> CreateShaderFromFileDXC(SHADER_TYPE        ShaderType,
-                                                          const char*        File,
-                                                          const char*        EntryPoint,
-                                                          const char*        Name,
-                                                          const ShaderMacro* Macros = nullptr)
+    static RefCntAutoPtr<IShader> CreateShaderFromFileDXC(SHADER_TYPE             ShaderType,
+                                                          const char*             File,
+                                                          const char*             EntryPoint,
+                                                          const char*             Name,
+                                                          const ShaderMacroArray& Macros = {})
     {
         return CreateShaderFromFile(ShaderType, File, EntryPoint, Name, Macros, [&](ShaderCreateInfo& ShaderCI) { ShaderCI.ShaderCompiler = SHADER_COMPILER_DXC; });
     }

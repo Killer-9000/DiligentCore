@@ -337,6 +337,16 @@ TEST(Platforms_FileSystem, GetPathComponents)
     TestComponents("\\a\\b\\c\\file", "\\a\\b\\c", "file");
 }
 
+TEST(Platforms_FileSystem, BuildPathFromComponents)
+{
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{}}).c_str(), "");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}}, '\\').c_str(), "a");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}}, '/').c_str(), "a");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}, {"b"}}, '\\').c_str(), "a\\b");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}, {"b"}}, '/').c_str(), "a/b");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}, {"b"}, {"c"}}, '\\').c_str(), "a\\b\\c");
+    EXPECT_STREQ(FileSystem::BuildPathFromComponents({{"a"}, {"b"}, {"c"}}, '/').c_str(), "a/b/c");
+}
 
 TEST(Platforms_FileSystem, GetRelativePath)
 {
@@ -546,9 +556,9 @@ TEST(Platforms_FileSystem, Search)
     EXPECT_TRUE(SearchRes.empty());
 }
 
-TEST(Platforms_FileSystem, GetLocalAppDataDirectory)
+void TestGetLocalAppDataDirectory(const char* AppName)
 {
-    const auto AppDataDir = FileSystem::GetLocalAppDataDirectory("DiligentTests");
+    const auto AppDataDir = FileSystem::GetLocalAppDataDirectory(AppName);
     ASSERT_TRUE(FileSystem::PathExists(AppDataDir.c_str()));
     const Uint32 TestData[] = {0, 1, 2, 3};
 
@@ -580,6 +590,16 @@ TEST(Platforms_FileSystem, GetLocalAppDataDirectory)
 
     FileSystem::DeleteDirectory(AppDataDir.c_str());
     EXPECT_FALSE(FileSystem::PathExists(AppDataDir.c_str()));
+}
+
+TEST(Platforms_FileSystem, GetLocalAppDataDirectory)
+{
+    TestGetLocalAppDataDirectory("DiligentTests");
+}
+
+TEST(Platforms_FileSystem, GetLocalAppDataDirectory_NullAppName)
+{
+    TestGetLocalAppDataDirectory(nullptr);
 }
 
 } // namespace

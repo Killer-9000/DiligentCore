@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,7 +68,7 @@ DILIGENT_TYPED_ENUM(SHADER_SOURCE_LANGUAGE, Uint32)
 
     /// The source language is Metal shading language (MSL)
     SHADER_SOURCE_LANGUAGE_MSL,
-    
+
     /// The source language is Metal shading language (MSL) that should be compiled verbatim
 
     /// Note that shader macros are ignored when compiling MSL verbatim, and an application
@@ -227,9 +227,13 @@ DILIGENT_END_INTERFACE
 #endif
 
 
+/// Shader Macro
 struct ShaderMacro
 {
-    const Char* Name       DEFAULT_INITIALIZER(nullptr);
+    /// Macro name
+    const Char* Name DEFAULT_INITIALIZER(nullptr);
+
+    /// Macro definition
     const Char* Definition DEFAULT_INITIALIZER(nullptr);
 
 #if DILIGENT_CPP_INTERFACE
@@ -254,6 +258,59 @@ struct ShaderMacro
 #endif
 };
 typedef struct ShaderMacro ShaderMacro;
+
+
+/// Shader macro array
+struct ShaderMacroArray
+{
+    /// A pointer to the array elements
+    const ShaderMacro* Elements DEFAULT_INITIALIZER(nullptr);
+
+    /// The number of elements in the array
+    Uint32 Count DEFAULT_INITIALIZER(0);
+
+#if DILIGENT_CPP_INTERFACE
+    constexpr ShaderMacroArray() noexcept
+    {}
+
+    constexpr ShaderMacroArray(const ShaderMacro* _Elements,
+                               Uint32             _Count) noexcept :
+        Elements{_Elements},
+        Count{_Count}
+    {}
+
+    constexpr bool operator==(const ShaderMacroArray& RHS) const noexcept
+    {
+        if (Count != RHS.Count)
+            return false;
+
+        if ((Count != 0 && Elements == nullptr) || (RHS.Count != 0 && RHS.Elements == nullptr))
+            return false;
+        for (Uint32 i = 0; i < Count; ++i)
+        {
+            if (Elements[i] != RHS.Elements[i])
+                return false;
+        }
+        return true;
+    }
+
+    constexpr bool operator!=(const ShaderMacroArray& RHS) const noexcept
+    {
+        return !(*this == RHS);
+    }
+
+    explicit constexpr operator bool() const noexcept
+    {
+        return Elements != nullptr && Count > 0;
+    }
+
+    const ShaderMacro& operator[](size_t index) const noexcept
+    {
+        return Elements[index];
+    }
+#endif
+};
+typedef struct ShaderMacroArray ShaderMacroArray;
 
 
 // clang-format off
@@ -291,19 +348,6 @@ struct ShaderCreateInfo
     /// It is also used to create additional input streams for shader include files
     IShaderSourceInputStreamFactory* pShaderSourceStreamFactory DEFAULT_INITIALIZER(nullptr);
 
-    /// HLSL->GLSL conversion stream
-
-    /// If HLSL->GLSL converter is used to convert HLSL shader source to
-    /// GLSL, this member can provide pointer to the conversion stream. It is useful
-    /// when the same file is used to create a number of different shaders. If
-    /// ppConversionStream is null, the converter will parse the same file
-    /// every time new shader is converted. If ppConversionStream is not null,
-    /// the converter will write pointer to the conversion stream to *ppConversionStream
-    /// the first time and will use it in all subsequent times.
-    /// For all subsequent conversions, FilePath member must be the same, or
-    /// new stream will be created and warning message will be displayed.
-    struct IHLSL2GLSLConversionStream** ppConversionStream DEFAULT_INITIALIZER(nullptr);
-
     /// Shader source
 
     /// If shader source is provided, FilePath and ByteCode members must be null
@@ -324,6 +368,9 @@ struct ShaderCreateInfo
     ///        HLSL shaders need to be compiled against 4.0 profile or higher.
     const void* ByteCode DEFAULT_INITIALIZER(nullptr);
 
+#if defined(DILIGENT_SHARP_GEN)
+    size_t ByteCodeSize DEFAULT_INITIALIZER(0);
+#else
     union
     {
         /// Length of the source code, when Source is not null.
@@ -340,16 +387,15 @@ struct ShaderCreateInfo
         /// Byte code size (in bytes) must not be zero if ByteCode is not null.
         size_t ByteCodeSize;
     };
+#endif
 
     /// Shader entry point
 
     /// This member is ignored if ByteCode is not null
     const Char* EntryPoint DEFAULT_INITIALIZER("main");
 
-    /// Shader macros
-
-    /// This member is ignored if ByteCode is not null
-    const ShaderMacro* Macros DEFAULT_INITIALIZER(nullptr);
+    /// Shader macros (see Diligent::ShaderMacroArray)
+    ShaderMacroArray Macros;
 
     /// Shader description. See Diligent::ShaderDesc.
     ShaderDesc Desc;
@@ -393,14 +439,7 @@ struct ShaderCreateInfo
     ///       and should be disabled when it is not needed.
     bool LoadConstantBufferReflection DEFAULT_INITIALIZER(false);
 
-    /// Memory address where pointer to the compiler messages data blob will be written
-
-    /// The buffer contains two null-terminated strings. The first one is the compiler
-    /// output message. The second one is the full shader source code including definitions added
-    /// by the engine. Data blob object must be released by the client.
-    IDataBlob** ppCompilerOutput DEFAULT_INITIALIZER(nullptr);
-
-#if DILIGENT_CPP_INTERFACE
+#if DILIGENT_CPP_INTERFACE && !defined(DILIGENT_SHARP_GEN)
     constexpr ShaderCreateInfo() noexcept
     {}
 
@@ -419,7 +458,7 @@ struct ShaderCreateInfo
     constexpr ShaderCreateInfo(const Char*                      _FilePath,
                                IShaderSourceInputStreamFactory* _pSourceFactory,
                                const Char*                      _EntryPoint,
-                               const ShaderMacro*               _Macros         = ShaderCreateInfo{}.Macros,
+                               const ShaderMacroArray&          _Macros         = ShaderCreateInfo{}.Macros,
                                SHADER_SOURCE_LANGUAGE           _SourceLanguage = ShaderCreateInfo{}.SourceLanguage,
                                const ShaderDesc&                _Desc           = ShaderDesc{}) noexcept :
         // clang-format off
@@ -432,12 +471,12 @@ struct ShaderCreateInfo
     // clang-format on
     {}
 
-    constexpr ShaderCreateInfo(const Char*            _Source,
-                               size_t                 _SourceLength,
-                               const Char*            _EntryPoint     = ShaderCreateInfo{}.EntryPoint,
-                               const ShaderMacro*     _Macros         = ShaderCreateInfo{}.Macros,
-                               SHADER_SOURCE_LANGUAGE _SourceLanguage = ShaderCreateInfo{}.SourceLanguage,
-                               const ShaderDesc&      _Desc           = ShaderDesc{}) noexcept :
+    constexpr ShaderCreateInfo(const Char*             _Source,
+                               size_t                  _SourceLength,
+                               const Char*             _EntryPoint     = ShaderCreateInfo{}.EntryPoint,
+                               const ShaderMacroArray& _Macros         = ShaderCreateInfo{}.Macros,
+                               SHADER_SOURCE_LANGUAGE  _SourceLanguage = ShaderCreateInfo{}.SourceLanguage,
+                               const ShaderDesc&       _Desc           = ShaderDesc{}) noexcept :
         // clang-format off
         Source        {_Source},
         SourceLength  {_SourceLength},
@@ -500,20 +539,7 @@ struct ShaderCreateInfo
         if (!SafeStrEqual(CI1.EntryPoint, CI2.EntryPoint))
             return false;
 
-        const auto* m1 = CI1.Macros;
-        const auto* m2 = CI2.Macros;
-        while (m1 != nullptr && m2 != nullptr)
-        {
-            if (*m1 != *m2)
-                return false;
-            ++m1;
-            ++m2;
-            if (*m1 == ShaderMacro{})
-                m1 = nullptr;
-            if (*m2 == ShaderMacro{})
-                m2 = nullptr;
-        }
-        if (m1 != nullptr || m2 != nullptr)
+        if (CI1.Macros != CI2.Macros)
             return false;
 
         if (CI1.Desc != CI2.Desc)

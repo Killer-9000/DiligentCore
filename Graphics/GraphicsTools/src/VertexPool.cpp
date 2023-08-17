@@ -102,7 +102,7 @@ public:
 
     virtual IObject* GetUserData() const override final
     {
-        return m_pUserData.RawPtr<IObject>();
+        return m_pUserData;
     }
 
 private:
@@ -165,7 +165,7 @@ public:
 
             DynamicBufferCreateInfo DynBuffCI;
             DynBuffCI.Desc.Name           = Name.c_str();
-            DynBuffCI.Desc.Size           = m_Desc.VertexCount * VtxElem.Size;
+            DynBuffCI.Desc.Size           = Uint64{m_Desc.VertexCount} * Uint64{VtxElem.Size};
             DynBuffCI.Desc.BindFlags      = VtxElem.BindFlags;
             DynBuffCI.Desc.Usage          = VtxElem.Usage;
             DynBuffCI.Desc.CPUAccessFlags = VtxElem.CPUAccessFlags;

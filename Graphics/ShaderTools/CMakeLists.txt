@@ -63,10 +63,13 @@ if (DXC_SUPPORTED)
     if(PLATFORM_LINUX)
         list(APPEND INCLUDE
             ../../ThirdParty/DirectXShaderCompiler/dxc/dxcapi.h
-            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/WinAdapter.h
-            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/WinFunctions.h)
+            ../../ThirdParty/DirectXShaderCompiler/dxc/WinAdapter.h
+            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/WinFunctions.h
+            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/WinIncludes.h
+            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/Unicode.h
+            ../../ThirdParty/DirectXShaderCompiler/dxc/DxilContainer/DxilContainer.h
+            ../../ThirdParty/DirectXShaderCompiler/dxc/DXIL/DxilConstants.h)
         list(APPEND SOURCE
-            ../../ThirdParty/DirectXShaderCompiler/dxc/Support/dxcapi.cpp
             ../../ThirdParty/DirectXShaderCompiler/dxc/Support/WinAdapter.cpp)
     endif()
 else()
@@ -176,13 +179,18 @@ target_sources(Diligent-ShaderTools PRIVATE
     ${HLSL_DEFINITIONS_INC}
 )
 
-add_custom_command(OUTPUT ${HLSL_DEFINITIONS_INC} # We must use full path here!
-                   COMMAND ${PYTHON_EXECUTABLE} ${FILE2STRING_PATH} ${HLSL_DEFINITIONS} include/HLSLDefinitions_inc.fxh
-                   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                   MAIN_DEPENDENCY ${HLSL_DEFINITIONS}
-                   COMMENT "Processing HLSLDefinitions.fxh"
-                   VERBATIM
-)
+if(NOT "${FILE2STRING_PATH}" STREQUAL "")
+    find_package(Python3 REQUIRED)
+    add_custom_command(OUTPUT ${HLSL_DEFINITIONS_INC} # We must use full path here!
+                       COMMAND ${Python3_EXECUTABLE} ${FILE2STRING_PATH} ${HLSL_DEFINITIONS} include/HLSLDefinitions_inc.fxh
+                       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                       MAIN_DEPENDENCY ${HLSL_DEFINITIONS}
+                       COMMENT "Processing HLSLDefinitions.fxh"
+                       VERBATIM
+    )
+else()
+    message(WARNING "File2String utility is currently unavailable on this host system. This is not an issue unless you modify HLSLDefinitions.fxh file")
+endif()
 
 set_common_target_properties(Diligent-ShaderTools)
 

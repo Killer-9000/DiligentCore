@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -618,7 +618,7 @@ void SwapChainVkImpl::InitBuffersAndViews()
         DepthBufferDesc.Name                            = "Main depth buffer";
         RefCntAutoPtr<ITexture> pDepthBufferTex;
         m_pRenderDevice->CreateTexture(DepthBufferDesc, nullptr, static_cast<ITexture**>(&pDepthBufferTex));
-        auto pDSV         = pDepthBufferTex->GetDefaultView(TEXTURE_VIEW_DEPTH_STENCIL);
+        auto* pDSV        = pDepthBufferTex->GetDefaultView(TEXTURE_VIEW_DEPTH_STENCIL);
         m_pDepthBufferDSV = RefCntAutoPtr<ITextureViewVk>(pDSV, IID_TextureViewVk);
     }
 }
@@ -818,7 +818,7 @@ void SwapChainVkImpl::ReleaseSwapChainResources(DeviceContextVkImpl* pImmediateC
         }
     }
 
-    RenderDeviceVkImpl* pDeviceVk = m_pRenderDevice.RawPtr<RenderDeviceVkImpl>();
+    auto* pDeviceVk = m_pRenderDevice.RawPtr<RenderDeviceVkImpl>();
 
     // This will release references to Vk swap chain buffers hold by
     // m_pBackBufferRTV[].
@@ -889,7 +889,7 @@ void SwapChainVkImpl::Resize(Uint32 NewWidth, Uint32 NewHeight, SURFACE_TRANSFOR
     if (m_VkSurface != VK_NULL_HANDLE)
     {
         // Check orientation
-        const auto* pRenderDeviceVk = m_pRenderDevice.RawPtr<const RenderDeviceVkImpl>();
+        const auto* pRenderDeviceVk = m_pRenderDevice.ConstPtr<RenderDeviceVkImpl>();
         const auto& PhysicalDevice  = pRenderDeviceVk->GetPhysicalDevice();
         const auto  vkDeviceHandle  = PhysicalDevice.GetVkDeviceHandle();
 

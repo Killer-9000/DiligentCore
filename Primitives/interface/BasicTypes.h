@@ -29,7 +29,7 @@
 
 #include "CommonDefinitions.h"
 
-#if DILIGENT_C_INTERFACE
+#if DILIGENT_C_INTERFACE || defined(DILIGENT_SHARP_GEN)
 #    include <stdbool.h>
 #    include <stddef.h>
 #else
@@ -61,7 +61,7 @@ static const Bool False = false;
 static const Bool True  = true;
 
 typedef char Char;
-#if !DILIGENT_C_INTERFACE
+#if !DILIGENT_C_INTERFACE && !defined(DILIGENT_SHARP_GEN)
 using String = std::basic_string<Char>; ///< String variable
 #endif
 

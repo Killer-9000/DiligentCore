@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -750,16 +750,16 @@ struct PipelineResourceSignatureDescX : DeviceObjectAttribsX<PipelineResourceSig
         return SyncDesc();
     }
 
-    void ClearResources()
+    PipelineResourceSignatureDescX& ClearResources()
     {
         ResCopy.clear();
-        SyncDesc();
+        return SyncDesc();
     }
 
-    void ClearImmutableSamplers()
+    PipelineResourceSignatureDescX& ClearImmutableSamplers()
     {
         ImtblSamCopy.clear();
-        SyncDesc();
+        return SyncDesc();
     }
 
     PipelineResourceSignatureDescX& SetBindingIndex(Uint8 _BindingIndex) noexcept
@@ -782,10 +782,11 @@ struct PipelineResourceSignatureDescX : DeviceObjectAttribsX<PipelineResourceSig
         return *this;
     }
 
-    void Clear()
+    PipelineResourceSignatureDescX& Clear()
     {
         PipelineResourceSignatureDescX CleanDesc;
         std::swap(*this, CleanDesc);
+        return *this;
     }
 
 private:
@@ -924,22 +925,25 @@ struct PipelineResourceLayoutDescX : PipelineResourceLayoutDesc
         return SyncDesc();
     }
 
-    void ClearVariables()
+    PipelineResourceLayoutDescX& ClearVariables()
     {
         VarCopy.clear();
         SyncDesc();
+        return *this;
     }
 
-    void ClearImmutableSamplers()
+    PipelineResourceLayoutDescX& ClearImmutableSamplers()
     {
         ImtblSamCopy.clear();
         SyncDesc();
+        return *this;
     }
 
-    void Clear()
+    PipelineResourceLayoutDescX& Clear()
     {
         PipelineResourceLayoutDescX CleanDesc;
         std::swap(*this, CleanDesc);
+        return *this;
     }
 
 private:
@@ -1904,7 +1908,11 @@ public:
 
     RefCntAutoPtr<IShader> CreateShader(const ShaderCreateInfo& ShaderCI) noexcept(!ThrowOnError)
     {
-        return CreateDeviceObject<IShader>("shader", ShaderCI.Desc.Name, &IRenderDevice::CreateShader, ShaderCI);
+        RefCntAutoPtr<IShader> pShader;
+        m_pDevice->CreateShader(ShaderCI, &pShader, nullptr);
+        if (!pShader && ThrowOnError)
+            LOG_ERROR_AND_THROW("Failed to create shader '", (ShaderCI.Desc.Name != nullptr ? ShaderCI.Desc.Name : "<unnamed>"), "'.");
+        return pShader;
     }
 
     template <typename... ArgsType>
@@ -1919,10 +1927,10 @@ public:
         return CreateDeviceObject<ISampler>("sampler", SamDesc.Name, &IRenderDevice::CreateSampler, SamDesc);
     }
 
-    RefCntAutoPtr<IResourceMapping> CreateResourceMapping(const ResourceMappingDesc& Desc) noexcept(!ThrowOnError)
+    RefCntAutoPtr<IResourceMapping> CreateResourceMapping(const ResourceMappingCreateInfo& ResMappingCI) noexcept(!ThrowOnError)
     {
         RefCntAutoPtr<IResourceMapping> pResMapping;
-        m_pDevice->CreateResourceMapping(Desc, &pResMapping);
+        m_pDevice->CreateResourceMapping(ResMappingCI, &pResMapping);
         if (!pResMapping && ThrowOnError)
             LOG_ERROR_AND_THROW("Failed to create resource mapping.");
         return pResMapping;
@@ -2059,7 +2067,7 @@ public:
 
     IRenderDevice* GetDevice() const noexcept
     {
-        return m_pDevice.RawPtr<IRenderDevice>();
+        return m_pDevice;
     }
 
     operator IRenderDevice*() const noexcept

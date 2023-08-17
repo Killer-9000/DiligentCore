@@ -1194,6 +1194,43 @@ TEST(Common_BasicMath, StdFloorCeilVector)
     EXPECT_EQ(std::ceil(float4(0.1f, 1.2f, 2.3f, 3.4f)), float4(1, 2, 3, 4));
 }
 
+TEST(Common_BasicMath, FastFloorCeil)
+{
+    for (float x = 1.f; x < FLT_MAX / 2.f; x *= 2.f)
+    {
+        EXPECT_EQ(FastFloor(x), x);
+        EXPECT_EQ(FastFloor(x + 0.5f), std::floor(x + 0.5f));
+        EXPECT_EQ(FastFloor(x - 0.5f), std::floor(x - 0.5f));
+        EXPECT_EQ(FastFloor(-x), -x);
+        EXPECT_EQ(FastFloor(-x + 0.5f), std::floor(-x + 0.5f));
+        EXPECT_EQ(FastFloor(-x - 0.5f), std::floor(-x - 0.5f));
+
+        EXPECT_EQ(FastCeil(x), x);
+        EXPECT_EQ(FastCeil(x + 0.5f), std::ceil(x + 0.5f));
+        EXPECT_EQ(FastCeil(x - 0.5f), std::ceil(x - 0.5f));
+        EXPECT_EQ(FastCeil(-x), -x);
+        EXPECT_EQ(FastCeil(-x + 0.5f), std::ceil(-x + 0.5f));
+        EXPECT_EQ(FastCeil(-x - 0.5f), std::ceil(-x - 0.5f));
+    }
+
+    for (double x = 1.0; x < DBL_MAX / 2.0; x *= 2.0)
+    {
+        EXPECT_EQ(FastFloor(x), x);
+        EXPECT_EQ(FastFloor(x + 0.5), std::floor(x + 0.5));
+        EXPECT_EQ(FastFloor(x - 0.5), std::floor(x - 0.5));
+        EXPECT_EQ(FastFloor(-x), -x);
+        EXPECT_EQ(FastFloor(-x + 0.5), std::floor(-x + 0.5));
+        EXPECT_EQ(FastFloor(-x - 0.5), std::floor(-x - 0.5));
+
+        EXPECT_EQ(FastCeil(x), x);
+        EXPECT_EQ(FastCeil(x + 0.5), std::ceil(x + 0.5));
+        EXPECT_EQ(FastCeil(x - 0.5), std::ceil(x - 0.5));
+        EXPECT_EQ(FastCeil(-x), -x);
+        EXPECT_EQ(FastCeil(-x + 0.5), std::ceil(-x + 0.5));
+        EXPECT_EQ(FastCeil(-x - 0.5), std::ceil(-x - 0.5));
+    }
+}
+
 TEST(Common_BasicMath, FastFloorCeilVector)
 {
     EXPECT_EQ(FastFloor(float2(-0.1f, 1.2f)), float2(-1, 1));
@@ -2829,6 +2866,26 @@ TEST(Common_AdvancedMath, TriangulatePolygon2D)
         }
 
         const auto Tris = TriangulatePolygon<Uint32>(Verts);
+        EXPECT_EQ(Tris, RefTris);
+    }
+
+    {
+        const std::vector<double2> Verts = {
+            {251.55066534585424, -239.37523310019236},
+            {405.01594942379404, -231.22402215509803},
+            {424.89128667213618, -233.76279213022161},
+            {354.97745192934343, -200.59163763765051},
+            {336.35298518777898, -212.50452779126249},
+            {207.88902013106224, -220.28173532753399},
+            {165.87167349297070, -158.97831739129651},
+            {165.87232914097831, -199.49128333157239},
+            {167.04717227593247, -201.15364958147507},
+            {170.33697864625216, -214.39292757663975},
+            {165.87260207492534, -216.35619205753781},
+        };
+        const auto Tris = TriangulatePolygon<Uint32>(Verts, false);
+
+        const std::vector<Uint32> RefTris = {1, 2, 3, 1, 3, 4, 0, 1, 4, 0, 4, 5, 10, 0, 5, 5, 6, 7, 5, 7, 8, 5, 8, 9, 5, 9, 10};
         EXPECT_EQ(Tris, RefTris);
     }
 }

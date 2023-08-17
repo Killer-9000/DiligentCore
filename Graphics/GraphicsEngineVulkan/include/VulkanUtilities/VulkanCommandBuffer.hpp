@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -166,14 +166,14 @@ public:
 #endif
     }
 
-    __forceinline void DrawMesh(uint32_t TaskCount, uint32_t FirstTask)
+    __forceinline void DrawMesh(uint32_t TaskCountX, uint32_t TaskCountY, uint32_t TaskCountZ)
     {
 #if DILIGENT_USE_VOLK
         VERIFY_EXPR(m_VkCmdBuffer != VK_NULL_HANDLE);
-        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksNV() must be called inside render pass");
+        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksEXT() must be called inside render pass");
         VERIFY(m_State.GraphicsPipeline != VK_NULL_HANDLE, "No graphics pipeline bound");
 
-        vkCmdDrawMeshTasksNV(m_VkCmdBuffer, TaskCount, FirstTask);
+        vkCmdDrawMeshTasksEXT(m_VkCmdBuffer, TaskCountX, TaskCountY, TaskCountZ);
 #else
         UNSUPPORTED("DrawMesh is not supported when vulkan library is linked statically");
 #endif
@@ -183,10 +183,10 @@ public:
     {
 #if DILIGENT_USE_VOLK
         VERIFY_EXPR(m_VkCmdBuffer != VK_NULL_HANDLE);
-        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksNV() must be called inside render pass");
+        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksIndirectEXT() must be called inside render pass");
         VERIFY(m_State.GraphicsPipeline != VK_NULL_HANDLE, "No graphics pipeline bound");
 
-        vkCmdDrawMeshTasksIndirectNV(m_VkCmdBuffer, Buffer, Offset, DrawCount, Stride);
+        vkCmdDrawMeshTasksIndirectEXT(m_VkCmdBuffer, Buffer, Offset, DrawCount, Stride);
 #else
         UNSUPPORTED("DrawMeshIndirect is not supported when vulkan library is linked statically");
 #endif
@@ -196,10 +196,10 @@ public:
     {
 #if DILIGENT_USE_VOLK
         VERIFY_EXPR(m_VkCmdBuffer != VK_NULL_HANDLE);
-        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksIndirectCountNV() must be called inside render pass");
+        VERIFY(m_State.RenderPass != VK_NULL_HANDLE, "vkCmdDrawMeshTasksIndirectCountEXT() must be called inside render pass");
         VERIFY(m_State.GraphicsPipeline != VK_NULL_HANDLE, "No graphics pipeline bound");
 
-        vkCmdDrawMeshTasksIndirectCountNV(m_VkCmdBuffer, Buffer, Offset, CountBuffer, CountBufferOffset, MaxDrawCount, Stride);
+        vkCmdDrawMeshTasksIndirectCountEXT(m_VkCmdBuffer, Buffer, Offset, CountBuffer, CountBufferOffset, MaxDrawCount, Stride);
 #else
         UNSUPPORTED("DrawMeshIndirectCount is not supported when vulkan library is linked statically");
 #endif

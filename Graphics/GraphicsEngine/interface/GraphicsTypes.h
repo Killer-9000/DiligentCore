@@ -1,5 +1,5 @@
 /*
- *  Copyright 2019-2022 Diligent Graphics LLC
+ *  Copyright 2019-2023 Diligent Graphics LLC
  *  Copyright 2015-2019 Egor Yusov
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -327,6 +327,11 @@ DILIGENT_TYPED_ENUM(TEXTURE_VIEW_TYPE, Uint8)
     /// A texture view will define a depth stencil view that will be used
     /// as the target for rendering operations
     TEXTURE_VIEW_DEPTH_STENCIL,
+
+    /// A texture view will define a read-only depth stencil view that will be used
+    /// as depth stencil source for rendering operations, but can also be simultaneously
+    /// read from shaders.
+    TEXTURE_VIEW_READ_ONLY_DEPTH_STENCIL,
 
     /// A texture view will define an unordered access view that will be used
     /// for unordered read/write operations from the shaders
@@ -1840,7 +1845,7 @@ struct DeviceFeatures
     }
 
     /// Comparison operator tests if two structures are equivalent
-    bool operator == (const DeviceFeatures& RHS) const 
+    bool operator == (const DeviceFeatures& RHS) const
     {
         return memcmp(this, &RHS, sizeof(DeviceFeatures)) == 0;
     }
@@ -1902,10 +1907,9 @@ struct Version
     constexpr Version() noexcept
     {}
 
-    template <typename T, typename = typename std::enable_if<std::is_integral<T>::value>::type>
-    constexpr Version(T _Major, T _Minor) noexcept :
-        Major{static_cast<decltype(Major)>(_Major)},
-        Minor{static_cast<decltype(Minor)>(_Minor)}
+    constexpr Version(Uint32 _Major, Uint32 _Minor) noexcept :
+        Major{_Major},
+        Minor{_Minor}
     {
     }
 
@@ -2073,7 +2077,7 @@ struct SamplerProperties
     constexpr bool operator==(const SamplerProperties& RHS) const
     {
         return BorderSamplingModeSupported   == RHS.BorderSamplingModeSupported   &&
-               AnisotropicFilteringSupported == RHS.AnisotropicFilteringSupported && 
+               AnisotropicFilteringSupported == RHS.AnisotropicFilteringSupported &&
                LODBiasSupported              == RHS.LODBiasSupported;
     }
 #endif
@@ -2107,10 +2111,10 @@ struct WaveOpProperties
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator==(const WaveOpProperties& RHS) const 
+    constexpr bool operator==(const WaveOpProperties& RHS) const
     {
         return MinSize         == RHS.MinSize         &&
-               MaxSize         == RHS.MaxSize         && 
+               MaxSize         == RHS.MaxSize         &&
                SupportedStages == RHS.SupportedStages &&
                Features        == RHS.Features;
     }
@@ -2145,7 +2149,7 @@ struct BufferProperties
     constexpr bool operator==(const BufferProperties& RHS) const
     {
         return ConstantBufferOffsetAlignment   == RHS.ConstantBufferOffsetAlignment &&
-               StructuredBufferOffsetAlignment == RHS.StructuredBufferOffsetAlignment;         
+               StructuredBufferOffsetAlignment == RHS.StructuredBufferOffsetAlignment;
     }
 #endif
 
@@ -2224,7 +2228,7 @@ struct RayTracingProperties
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator==(const RayTracingProperties& RHS) const 
+    constexpr bool operator==(const RayTracingProperties& RHS) const
     {
         return MaxRecursionDepth        == RHS.MaxRecursionDepth        &&
                ShaderGroupHandleSize    == RHS.ShaderGroupHandleSize    &&
@@ -2250,8 +2254,17 @@ typedef struct RayTracingProperties RayTracingProperties;
 /// Mesh Shader Properties
 struct MeshShaderProperties
 {
-    /// The maximum number of mesh shader tasks per draw command.
-    Uint32 MaxTaskCount DEFAULT_INITIALIZER(0);
+    /// The maximum number of mesh shader thread groups in X direction.
+    Uint32 MaxThreadGroupCountX DEFAULT_INITIALIZER(0);
+
+    /// The maximum number of mesh shader thread groups in Y direction.
+    Uint32 MaxThreadGroupCountY DEFAULT_INITIALIZER(0);
+
+    /// The maximum number of mesh shader thread groups in Z direction.
+    Uint32 MaxThreadGroupCountZ DEFAULT_INITIALIZER(0);
+
+    /// The total maximum number of mesh shader groups per draw command.
+    Uint32 MaxThreadGroupTotalCount DEFAULT_INITIALIZER(0);
 
 #if DILIGENT_CPP_INTERFACE
     /// Comparison operator tests if two structures are equivalent
@@ -2262,7 +2275,10 @@ struct MeshShaderProperties
     /// - False otherwise.
     constexpr bool operator==(const MeshShaderProperties& RHS) const
     {
-        return MaxTaskCount == RHS.MaxTaskCount;
+        return MaxThreadGroupCountX     == RHS.MaxThreadGroupCountX &&
+               MaxThreadGroupCountY     == RHS.MaxThreadGroupCountY &&
+               MaxThreadGroupCountZ     == RHS.MaxThreadGroupCountZ &&
+               MaxThreadGroupTotalCount == RHS.MaxThreadGroupTotalCount;
     }
 #endif
 };
@@ -2302,7 +2318,7 @@ struct ComputeShaderProperties
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator == (const ComputeShaderProperties& RHS) const 
+    constexpr bool operator == (const ComputeShaderProperties& RHS) const
     {
         return SharedMemorySize          == RHS.SharedMemorySize          &&
                MaxThreadGroupInvocations == RHS.MaxThreadGroupInvocations &&
@@ -2342,7 +2358,7 @@ struct NDCAttribs
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator == (const NDCAttribs& RHS) const 
+    constexpr bool operator == (const NDCAttribs& RHS) const
     {
         return MinZ          == RHS.MinZ          &&
                ZtoDepthScale == RHS.ZtoDepthScale &&
@@ -2370,7 +2386,7 @@ struct RenderDeviceShaderVersionInfo
     Version MSL DEFAULT_INITIALIZER({});
 
 #if DILIGENT_CPP_INTERFACE
-    constexpr bool operator == (const RenderDeviceShaderVersionInfo& RHS) const 
+    constexpr bool operator == (const RenderDeviceShaderVersionInfo& RHS) const
     {
         return HLSL   == RHS.HLSL   &&
                GLSL   == RHS.GLSL   &&
@@ -2378,7 +2394,7 @@ struct RenderDeviceShaderVersionInfo
                MSL    == RHS.MSL;
     }
 
-    constexpr bool operator != (const RenderDeviceShaderVersionInfo& RHS) const 
+    constexpr bool operator != (const RenderDeviceShaderVersionInfo& RHS) const
     {
         return !(*this == RHS);
     }
@@ -2444,13 +2460,13 @@ struct RenderDeviceInfo
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator == (const RenderDeviceInfo& RHS) const 
+    constexpr bool operator == (const RenderDeviceInfo& RHS) const
     {
         return Type             == RHS.Type       &&
                APIVersion       == RHS.APIVersion &&
                Features         == RHS.Features   &&
                NDC              == RHS.NDC        &&
-               MaxShaderVersion == RHS.MaxShaderVersion; 
+               MaxShaderVersion == RHS.MaxShaderVersion;
     }
 #endif
 };
@@ -2590,7 +2606,7 @@ typedef struct AdapterMemoryInfo AdapterMemoryInfo;
 
 /// Defines how shading rates coming from the different sources (base rate,
 /// primitive rate and VRS image rate) are combined.
-/// The combiner may be described by the following function: 
+/// The combiner may be described by the following function:
 ///     ApplyCombiner(SHADING_RATE_COMBINER Combiner, SHADING_RATE OriginalRate, SHADING_RATE NewRate).
 /// See IDeviceContext::SetShadingRate() for details.
 DILIGENT_TYPED_ENUM(SHADING_RATE_COMBINER, Uint8)
@@ -2805,7 +2821,7 @@ DILIGENT_TYPED_ENUM(SHADING_RATE_CAP_FLAGS, Uint16)
     /// Intermediate targets must be scaled to the final resolution in a separate pass.
     /// Intermediate targets can only be sampled with an immutable sampler created with SAMPLER_FLAG_SUBSAMPLED flag.
     /// If supported, rendering to the subsampled render targets may be more optimal.
-    /// 
+    ///
     /// \note  Both NON_SUBSAMPLED and SUBSAMPLED modes may be supported by a device.
     SHADING_RATE_CAP_FLAG_SUBSAMPLED_RENDER_TARGET              = 1u << 12
 };
@@ -2884,7 +2900,7 @@ struct ShadingRateProperties
                Format                   == RHS.Format                   &&
                ShadingRateTextureAccess == RHS.ShadingRateTextureAccess &&
                BindFlags                == RHS.BindFlags                &&
-               MaxSabsampledArraySlices == RHS.MaxSabsampledArraySlices && 
+               MaxSabsampledArraySlices == RHS.MaxSabsampledArraySlices &&
                memcmp(ShadingRates, RHS.ShadingRates, sizeof(ShadingRates)) == 0 &&
                memcmp(MinTileSize,  RHS.MinTileSize,  sizeof(MinTileSize))  == 0 &&
                memcmp(MaxTileSize,  RHS.MaxTileSize,  sizeof(MaxTileSize))  == 0;
@@ -3029,7 +3045,7 @@ DILIGENT_TYPED_ENUM(SPARSE_RESOURCE_CAP_FLAGS, Uint32)
     /// Specifies if textures with mip level dimensions that are not integer multiples of the corresponding
     /// dimensions of the sparse texture tile may be placed in the mip tail.
     /// If this capability is not reported, only mip levels with dimensions smaller than the
-    /// SparseTextureProperties::TilesSize will be placed in the mip tail. 
+    /// SparseTextureProperties::TilesSize will be placed in the mip tail.
     SPARSE_RESOURCE_CAP_FLAG_ALIGNED_MIP_SIZE          = 1u << 12,
 
     /// Specifies whether the device can consistently access non-resident (without bound memory) regions of a resource.
@@ -3109,7 +3125,7 @@ struct SparseResourceProperties
     /// \return
     /// - True if all members of the two structures are equal.
     /// - False otherwise.
-    constexpr bool operator==(const SparseResourceProperties& RHS) const 
+    constexpr bool operator==(const SparseResourceProperties& RHS) const
     {
         return AddressSpaceSize  == RHS.AddressSpaceSize  &&
                ResourceSpaceSize == RHS.ResourceSpaceSize &&
@@ -3530,6 +3546,15 @@ struct EngineD3D12CreateInfo DILIGENT_DERIVE(EngineCreateInfo)
     /// that can be allocated across all SRB objects.
     /// Note that due to heap fragmentation, releasing two chunks of sizes
     /// N and M does not necessarily make the chunk of size N+M available.
+    ///
+    /// When the application exits, the engine prints the GPU descriptor heap
+    /// statistics to the log, for example:
+    ///
+    ///     Diligent Engine: Info: D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER     GPU heap max allocated size (static|dynamic): 0/128 (0.00%) | 0/1920 (0.00%).
+    ///     Diligent Engine: Info: D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV GPU heap max allocated size (static|dynamic): 9/16384 (0.05%) | 128/32768 (0.39%).
+    ///
+    /// An application should monitor the GPU descriptor heap statistics and
+    /// set GPUDescriptorHeapSize and GPUDescriptorHeapDynamicSize accordingly.
     Uint32 GPUDescriptorHeapSize[2]
 #if DILIGENT_CPP_INTERFACE
         {
@@ -3593,6 +3618,13 @@ struct EngineD3D12CreateInfo DILIGENT_DERIVE(EngineCreateInfo)
     Uint32 NumDynamicHeapPagesToReserve DEFAULT_INITIALIZER(1);
 
     /// Query pool size for each query type.
+    ///
+    /// \remarks    In Direct3D12, queries are allocated from the pool, and
+    ///             one pool may contain multiple queries of different types.
+    ///             QueryPoolSizes array specifies the number of queries
+    ///             of each type that will be allocated from a single pool.
+    ///             The engine will create as many pools as necessary to
+    ///             satisfy the requested number of queries.
     Uint32 QueryPoolSizes[QUERY_TYPE_NUM_TYPES]
 #if DILIGENT_CPP_INTERFACE
         {
@@ -3748,20 +3780,27 @@ struct EngineVkCreateInfo DILIGENT_DERIVE(EngineCreateInfo)
 #endif
     ;
 
-    /// Allocation granularity for device-local memory
+    /// Allocation granularity for device-local memory.
+    ///
+    /// \remarks    Device-local memory is used for USAGE_DEFAULT and USAGE_IMMUTABLE
+    ///             GPU resources, such as buffers and textures.
+    ///
+    ///             If there is no available GPU memory, the resource will fail to be created.
     Uint32 DeviceLocalMemoryPageSize        DEFAULT_INITIALIZER(16 << 20);
 
-    /// Allocation granularity for host-visible memory
+    /// Allocation granularity for host-visible memory.
+    ///
+    /// \remarks   Host-visible memory is primarily used to upload data to GPU resources.
     Uint32 HostVisibleMemoryPageSize        DEFAULT_INITIALIZER(16 << 20);
 
     /// Amount of device-local memory reserved by the engine.
     /// The engine does not pre-allocate the memory, but rather keeps free
-    /// pages when resources are released
+    /// pages when resources are released.
     Uint32 DeviceLocalMemoryReserveSize     DEFAULT_INITIALIZER(256 << 20);
 
     /// Amount of host-visible memory reserved by the engine.
     /// The engine does not pre-allocate the memory, but rather keeps free
-    /// pages when resources are released
+    /// pages when resources are released.
     Uint32 HostVisibleMemoryReserveSize     DEFAULT_INITIALIZER(256 << 20);
 
     /// Page size of the upload heap that is allocated by immediate/deferred
@@ -3769,17 +3808,81 @@ struct EngineVkCreateInfo DILIGENT_DERIVE(EngineCreateInfo)
     /// suballocations.
     /// Upload heap is used to update resources with IDeviceContext::UpdateBuffer()
     /// and IDeviceContext::UpdateTexture().
+    ///
+    /// \remarks    Upload pages are allocated in host-visible memory. When a
+    ///             page becomes available, the engiene will keep it alive
+    ///             if the total size of the host-visible memory is less than
+    ///             HostVisibleMemoryReserveSize. Otherwise, the page will
+    ///             be released.
+    ///
+    ///             On exit, the engine prints the number of pages that were
+    ///             allocated by each context to the log, for example:
+    ///
+    ///                 Diligent Engine: Info: Upload heap of immediate context peak used/allocated frame size: 80.00 MB / 80.00 MB (80 pages)
+    ///
     Uint32 UploadHeapPageSize               DEFAULT_INITIALIZER(1 << 20);
 
     /// Size of the dynamic heap (the buffer that is used to suballocate
     /// memory for dynamic resources) shared by all contexts.
+    /// 
+    /// \remarks    The dynamic heap is used to allocate memory for dynamic
+    ///             resources. Each time a dynamic buffer or dynamic texture is mapped,
+    ///             the engine allocates a new chunk of memory from the dynamic heap.
+    ///             At the end of the frame, all dynamic memory allocated for the frame
+    ///             is recycled. However, it may not became available again until
+    ///             all command buffers that reference the memory are executed by the GPU
+    ///             (which typically happens 1-2 frames later). If space in the dynamic
+    ///             heap is exhausted, the engine will wait for up to 60 ms for the
+    ///             space released from previous frames to become available. If the space
+    ///             is still not available, the engine will fail to map the resource
+    ///             and return null pointer.
+    ///             The dynamic heap is shared by all contexts and cannot be resized
+    ///             on the fly. The application should track the amount of dynamic memory
+    ///             it needs and set this variable accordingly. When the application exits,
+    ///             the engine prints dynamic heap statistics to the log, for example:
+    ///
+    ///                 Diligent Engine: Info: Dynamic memory manager usage stats:
+    ///                 Total size: 8.00 MB. Peak allocated size: 0.50 MB. Peak utilization: 6.2%
+    ///
+    ///             The peak allocated size (0.50 MB in the example above) is the value that
+    ///             should be used to guide setting this variable. An application should always
+    ///             allow some extra space in the dynamic heap to avoid running out of dynamic memory.
     Uint32 DynamicHeapSize                  DEFAULT_INITIALIZER(8 << 20);
 
     /// Size of the memory chunk suballocated by immediate/deferred context from
-    /// the global dynamic heap to perform lock-free dynamic suballocations
+    /// the global dynamic heap to perform lock-free dynamic suballocations.
+    ///
+    /// \remarks    Dynamic memory is not allocated directly from the dynamic heap.
+    ///             Instead, when a context needs to allocate memory for a dynamic
+    ///             resource, it allocates a chunk of memory from the global dynamic
+    ///             heap (which requires synchronization with other contexts), and
+    ///             then performs lock-free suballocations from the chunk.
+    ///             The size of this chunk is set by DynamicHeapPageSize variable.
+    ///
+    ///             When the application exits, the engine prints dynamic heap statistics
+    ///             for each context to the log, for example:
+    ///
+    ///                 Diligent Engine: Info: Dynamic heap of immediate context usage stats:
+    ///                                        Peak used/aligned/allocated size: 94.14 KB / 94.56 KB / 256.00 KB (1 page). Peak efficiency (used/aligned): 99.6%. Peak utilization (used/allocated): 36.8%
+    ///
+    ///             * Peak used size is the total amount of memory required for dynamic resources
+    ///               allocated by the context during the frame.
+    ///             * Peak aligned size is the total amount of memory required for dynamic resources
+    ///               allocated by the context during the frame, accounting for necessary alignment. This
+    ///               value is always greater than or equal to the peak used size.   
+    ///             * Peak allocated size is the total amount of memory allocated from the dynamic
+    ///               heap by the context during the frame. This value is always a multiple of
+    ///               DynamicHeapPageSize.
     Uint32 DynamicHeapPageSize              DEFAULT_INITIALIZER(256 << 10);
 
     /// Query pool size for each query type.
+    ///
+    /// \remarks    In Vulkan, queries are allocated from the pool, and
+    ///             one pool may contain multiple queries of different types.
+    ///             QueryPoolSizes array specifies the number of queries
+    ///             of each type that will be allocated from a single pool.
+    ///             The engine will create as many pools as necessary to
+    ///             satisfy the requested number of queries.
     Uint32 QueryPoolSizes[QUERY_TYPE_NUM_TYPES]
 #if DILIGENT_CPP_INTERFACE
     {
@@ -3821,6 +3924,13 @@ struct EngineMtlCreateInfo DILIGENT_DERIVE(EngineCreateInfo)
     Uint32 DynamicHeapPageSize       DEFAULT_INITIALIZER(4 << 20);
 
     /// Query pool size for each query type.
+    ///
+    /// \remarks    In Metal, queries are allocated from the pool, and
+    ///             one pool may contain multiple queries of different types.
+    ///             QueryPoolSizes array specifies the number of queries
+    ///             of each type that will be allocated from a single pool.
+    ///             The engine will create as many pools as necessary to
+    ///             satisfy the requested number of queries.
     Uint32 QueryPoolSizes[QUERY_TYPE_NUM_TYPES]
     #if DILIGENT_CPP_INTERFACE
     {
